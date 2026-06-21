@@ -1,0 +1,105 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:panthalassa_parsers/panthalassa_parsers.dart';
+import 'package:test/test.dart';
+
+import 'support/fixtures.dart';
+
+void main() {
+  final registry = ParserRegistry.standard();
+  Uint8List u(String s) => Uint8List.fromList(utf8.encode(s));
+
+  group('STANAG family detection', () {
+    test('all sub-standards resolve to DocumentFormat.stanag', () {
+      expect(registry.detect(buildStanag4607Gmti()), DocumentFormat.stanag);
+      expect(registry.detect(buildMpegTsWithKlv()), DocumentFormat.stanag);
+    });
+  });
+
+  test('STANAG 4607 GMTI: packet header + segment enumeration', () {
+    final r = registry.parse(buildStanag4607Gmti());
+    expect(r.format, DocumentFormat.stanag);
+    expect(r.metadata['standard'], 'STANAG 4607');
+    expect(r.metadata['nationality'], 'US');
+    expect(r.metadata['classification'], 'UNCLASSIFIED');
+    expect(r.metadata['platformId'], 'PLATFORM01');
+    expect(r.metadata['missionId'], 7);
+    expect(r.metadata['segmentCount'], 1);
+    expect((r.metadata['segments'] as List).first['typeName'], 'Dwell');
+  });
+
+  test('STANAG 4609: MPEG-2 TS geometry, PIDs, KLV presence', () {
+    final r = registry.parse(buildMpegTsWithKlv());
+    expect(r.metadata['standard'], 'STANAG 4609');
+    expect(r.metadata['container'], 'MPEG-2 TS');
+    expect(r.metadata['packetSize'], 188);
+    expect(r.metadata['packetCount'], 3);
+    expect(r.metadata['distinctPidCount'], 3);
+    expect(r.metadata['hasKlvMetadata'], true);
+  });
+
+  test('STANAG 4609: absence of KLV is reported as a warning', () {
+    final r = registry.parse(buildMpegTsWithKlv(withKlv: false));
+    expect(r.metadata['hasKlvMetadata'], false);
+    expect(r.warnings.map((w) => w.code), contains('stanag4609.no_klv'));
+  });
+
+  test('STANAG 4676 NITS: track and track-point counts', () {
+    final r = registry.parse(u(
+      '<?xml version="1.0"?>'
+      '<TrackMessage xmlns="urn:nato:stanag:4676:0:3:tracks">'
+      '<securityClassification>NATO UNCLASSIFIED</securityClassification>'
+      '<Track><trackNumber>TRK-001</trackNumber>'
+      '<TrackPoint><lat>1.0</lat></TrackPoint>'
+      '<TrackPoint><lat>1.1</lat></TrackPoint></Track>'
+      '<Track><trackNumber>TRK-002</trackNumber>'
+      '<TrackPoint><lat>2.0</lat></TrackPoint></Track>'
+      '</TrackMessage>',
+    ));
+    expect(r.metadata['standard'], 'STANAG 4676');
+    expect(r.metadata['trackCount'], 2);
+    expect(r.metadata['trackPointCount'], 3);
+    expect(r.metadata['security'], 'NATO UNCLASSIFIED');
+    expect((r.metadata['trackNumbers'] as List), containsAll(['TRK-001', 'TRK-002']));
+  });
+
+  test('STANAG 4774: confidentiality label fields', () {
+    final r = registry.parse(u(
+      '<?xml version="1.0"?>'
+      '<OriginatorConfidentialityLabel '
+      'xmlns="urn:nato:stanag:4774:confidentialitymetadatalabel:1:0">'
+      '<ConfidentialityInformation>'
+      '<PolicyIdentifier>NATO</PolicyIdentifier>'
+      '<Classification>NATO SECRET</Classification>'
+      '<Category TagName="Releasable To" Type="PERMISSIVE">'
+      '<GenericValue>KEN</GenericValue></Category>'
+      '</ConfidentialityInformation>'
+      '</OriginatorConfidentialityLabel>',
+    ));
+    expect(r.metadata['standard'], 'STANAG 4774');
+    expect(r.metadata['policyIdentifier'], 'NATO');
+    expect(r.metadata['classification'], 'NATO SECRET');
+    expect((r.metadata['categories'] as List), contains('Releasable To'));
+  });
+
+  test('STANAG 4778 binding nesting a 4774 label routes to 4778, not 4774', () {
+    final r = registry.parse(u(
+      '<?xml version="1.0"?>'
+      '<BindingInformation '
+      'xmlns="urn:nato:stanag:4778:bindinginformation:1:0" '
+      'xmlns:ds="http://www.w3.org/2000/09/xmldsig#">'
+      '<MetadataBinding>'
+      '<Metadata><OriginatorConfidentialityLabel>'
+      '<ConfidentialityInformation><Classification>NATO SECRET</Classification>'
+      '</ConfidentialityInformation></OriginatorConfidentialityLabel></Metadata>'
+      '<ds:Signature><ds:SignatureValue>abc123</ds:SignatureValue></ds:Signature>'
+      '</MetadataBinding>'
+      '</BindingInformation>',
+    ));
+    expect(r.metadata['standard'], 'STANAG 4778');
+    expect(r.metadata['bindingCount'], 1);
+    expect(r.metadata['hasConfidentialityLabel'], true);
+    expect(r.metadata['hasSignature'], true);
+  });
+}
