@@ -11,7 +11,7 @@ import 'parse_exception.dart';
 /// unchecked indexing in the original spec's binary parsers.
 final class ByteReader {
   ByteReader(this.bytes, {this.endian = Endian.big})
-      : _view = ByteData.sublistView(bytes);
+    : _view = ByteData.sublistView(bytes);
 
   final Uint8List bytes;
   final ByteData _view;
@@ -59,6 +59,13 @@ final class ByteReader {
     return v;
   }
 
+  int readInt16() {
+    _require(2);
+    final v = _view.getInt16(_pos, endian);
+    _pos += 2;
+    return v;
+  }
+
   int readUint32() {
     _require(4);
     final v = _view.getUint32(_pos, endian);
@@ -84,10 +91,9 @@ final class ByteReader {
   /// NULs (the padding convention in NITF and DICOM string VRs).
   String readAsciiFixed(int count) {
     final raw = readBytes(count);
-    return ascii.decode(raw, allowInvalid: true).replaceAll(
-          RegExp(r'[\x00 ]+$'),
-          '',
-        );
+    return ascii
+        .decode(raw, allowInvalid: true)
+        .replaceAll(RegExp(r'[\x00 ]+$'), '');
   }
 
   int peekUint8() {

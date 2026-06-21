@@ -11,8 +11,7 @@ import 'package:test/test.dart';
 void main() {
   final registry = ParserRegistry.standard();
 
-  Uint8List read(String name) =>
-      File('test/fixtures/$name').readAsBytesSync();
+  Uint8List read(String name) => File('test/fixtures/$name').readAsBytesSync();
 
   void expectDecrypts(String fixture, String scheme) {
     final r = registry.parse(read(fixture));
@@ -25,13 +24,22 @@ void main() {
     expect(r.metadata['author'], 'Turkana Nation', reason: fixture);
   }
 
-  test('RC4-40 (R2) decrypts', () => expectDecrypts('enc_rc4_40.pdf', 'RC4-40 (R2)'));
-  test('RC4-128 (R3) decrypts',
-      () => expectDecrypts('enc_rc4_128.pdf', 'RC4-128 (R3)'));
-  test('AES-128 (R4) decrypts',
-      () => expectDecrypts('enc_aes_128.pdf', 'AES-128 (R4)'));
-  test('AES-256 (R6) decrypts',
-      () => expectDecrypts('enc_aes_256.pdf', 'AES-256 (R6)'));
+  test(
+    'RC4-40 (R2) decrypts',
+    () => expectDecrypts('enc_rc4_40.pdf', 'RC4-40 (R2)'),
+  );
+  test(
+    'RC4-128 (R3) decrypts',
+    () => expectDecrypts('enc_rc4_128.pdf', 'RC4-128 (R3)'),
+  );
+  test(
+    'AES-128 (R4) decrypts',
+    () => expectDecrypts('enc_aes_128.pdf', 'AES-128 (R4)'),
+  );
+  test(
+    'AES-256 (R6) decrypts',
+    () => expectDecrypts('enc_aes_256.pdf', 'AES-256 (R6)'),
+  );
 
   test('permission flags are surfaced from the encrypted document', () {
     final r = registry.parse(read('enc_aes_256.pdf'));

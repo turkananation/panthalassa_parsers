@@ -31,7 +31,9 @@ Future<void> main(List<String> args) async {
     stdout.writeln('format      : ${result.format.label}');
     stdout.writeln('documentId  : ${result.documentId}');
     stdout.writeln('bytes       : ${result.byteLength}');
-    stdout.writeln('metadata    : ${const JsonEncoder.withIndent('  ').convert(result.metadata)}');
+    stdout.writeln(
+      'metadata    : ${const JsonEncoder.withIndent('  ').convert(result.metadata)}',
+    );
     if (result.warnings.isNotEmpty) {
       stdout.writeln('warnings    :');
       for (final w in result.warnings) {

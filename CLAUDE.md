@@ -13,9 +13,10 @@ vault's hash.
 
 Targets: healthcare (FHIR JSON/XML, HL7 v2, CDA), structured JSON/XML (Verifiable
 Credentials, NIEM, ISO 20022, generic), EDI (EDIFACT, X12), positional (USMTF, STEP),
-binary (DICOM, NITF),
-the STANAG family (4607/4609/4676/4774/4778), and composite (PDF, ODF). The
-headline capability is text extraction from ordinary PDFs.
+binary (DICOM, NITF), the STANAG family
+(4607/4609/4676/4774/4778/7023/5516), and composite (PDF, ODF). The headline
+capabilities are text extraction from ordinary PDFs plus pure-Dart semantic and
+visual render foundations.
 
 ## Build & test
 
@@ -23,7 +24,7 @@ headline capability is text extraction from ordinary PDFs.
 export PATH=/opt/dart-sdk/bin:$PATH   # if the SDK is not already on PATH
 dart pub get
 dart analyze        # must be clean (CI gate)
-dart test           # 60 tests, all green
+dart test           # must be green; optional conformance fixtures may skip
 ```
 
 SDK floor is Dart 3.4 (sealed classes, switch expressions). **No `dart:io`** is
@@ -67,6 +68,13 @@ lib/
     pdf/pdf_crypt.dart             # Standard security handler: RC4, AES-128 (AESV2), AES-256 (AESV3/R6)
     pdf/pdf_encodings.dart         # WinAnsi/MacRoman tables + glyph-name→Unicode (AGL + uniXXXX)
     pdf/pdf_text.dart              # content tokenizer, fonts (ToUnicode/encoding/Type0), Do recursion, inline-image skip
+    pdf/pdf_visual.dart            # conservative visual display-list extraction for page geometry/text/rects/images
+  src/render/
+    document_ir.dart               # semantic DIR + RawVisualBlock bridge
+    document_renderer.dart         # text/Markdown/escaped-HTML renderers
+    visual_primitives.dart         # pure-Dart page/frame geometry + visual commands
+    visual_document.dart           # DIR -> VisualDocument projection
+    visual_renderer.dart           # SVG visual renderer
     stanag/
       stanag_parser.dart           # family dispatcher + StanagSubParser contract
       stanag_4607_gmti.dart        # GMTI (binary)
@@ -117,13 +125,14 @@ NITF parser** (it recognises the `NSIF` header), so it is not duplicated.
 | ISO 20022 | XML messages (pain/pacs/camt/…): message-definition id from namespace, business area. ASN.1 variant not impl (rare). |
 | X12 | ANSI ASC X12: positional ISA delimiters, GS/ST envelope, transaction sets, element text. |
 | Generic JSON / XML | Catch-all structured extraction (text + content-id + shape metadata) for anything unrecognised. |
-| DICOM | Meta group + dataset header + curated dictionary; stops at pixel data. No SQ descent, no full dictionary, no pixel decode. |
-| NITF | File header + image-segment table. Graphic/text/DES segments and TREs not parsed. |
-| STANAG 4607 | Packet header + segment enumeration. Segment *bodies* (dwell/target kinematics) are an extension point. |
-| STANAG 4609 | MPEG-2 TS geometry + PIDs + KLV-presence detection. Full MISB KLV decode is an extension point. |
-| STANAG 4676 | Track / track-point counts + security + ids. Per-point kinematics is an extension point. |
+| DICOM | Meta group + dataset header; SQ descent including undefined-length items; multi-valued string rendering; generic attribute list; visual frame placeholder when dimensions are known; stops before pixel data. Keyword dictionary is broad but not an exhaustive generated PS3.6 table. |
+| NITF | File header + image/graphic/text/DES/RES segment tables, subheaders, offsets, safe text-body extraction, and visual image placeholder when dimensions are known. Image pixels are not decoded. |
+| STANAG 4607 | Packet header + segment enumeration + common Mission/Dwell/Job Definition/Free Text body fields, including scaled coordinates and target velocities when present. |
+| STANAG 4609 | MPEG-2 TS geometry + PIDs + MISB ST 0601 local-set TLV fields for platform/sensor/frame-center metadata. Video essence is not decoded. |
+| STANAG 4676 | Track / track-point counts + security + ids + per-point time/position/velocity where present. |
+| STANAG 7023 / 5516 | NPIF header/segment index and conservative Link 16 framed-message metadata. 5516 tactical word semantics remain out of scope. |
 | STANAG 4774 / 4778 | Label fields / binding structure (label + signature presence). Signature verification out of scope. |
-| PDF | **Feature-complete for text + metadata.** Object streams + cross-reference streams; full filter set (Flate/LZW/ASCII85/ASCIIHex/RunLength) with PNG/TIFF predictors; **encryption** — Standard handler RC4-40/128, AES-128 (AESV2), AES-256 (AESV3/R6) with empty user password (validated against /U, fails closed otherwise); **fonts** — ToUnicode CMaps, WinAnsi/MacRoman encodings with `/Differences` glyph-name resolution, Type0/Identity-H composite fonts; Form XObject (`Do`) recursion; inline-image (`BI/ID/EI`) skipping; rich metadata (title/author/subject/keywords/dates, encryption scheme, permission flags); **PDF/A-3** associated/embedded files (`/AF` + `/Names/EmbeddedFiles` name tree) with XML/JSON payload text folded into the result (ZUGFeRD/Factur-X). **Inherent limits:** CID fonts with *no* ToUnicode (glyph indices carry no Unicode — skipped, not guessed), and image-only filters (DCT/JPX/CCITT/JBIG2, which are not text). |
+| PDF | **Feature-complete for text + metadata; visual rendering foundation started.** Object streams + cross-reference streams; full filter set (Flate/LZW/ASCII85/ASCIIHex/RunLength) with PNG/TIFF predictors; **encryption** — Standard handler RC4-40/128, AES-128 (AESV2), AES-256 (AESV3/R6) with empty user password (validated against /U, fails closed otherwise); **fonts** — ToUnicode CMaps, WinAnsi/MacRoman encodings with `/Differences` glyph-name resolution, Type0/Identity-H composite fonts; Form XObject (`Do`) recursion; inline-image (`BI/ID/EI`) skipping; rich metadata (title/author/subject/keywords/dates, encryption scheme, permission flags); **PDF/A-3** associated/embedded files (`/AF` + `/Names/EmbeddedFiles` name tree) with XML/JSON payload text folded into the result (ZUGFeRD/Factur-X). Visual metadata includes page geometry plus conservative text/rectangle/image-placeholder commands and SVG preview output. **Inherent limits:** CID fonts with *no* ToUnicode (glyph indices carry no Unicode — skipped, not guessed), full PDF graphics-state transforms/clipping/shading/masks/blends, glyph-outline rasterization, and image codecs (DCT/JPX/CCITT/JBIG2) remain future fidelity work. |
 
 See `CONTINUATION.md` for the ticketed backlog.
 

@@ -22,10 +22,23 @@ final class XmlFhirParser implements DocumentParser {
   /// A representative slice of FHIR R4/R5 resource roots. Extend as needed; the
   /// namespace check covers resources omitted here.
   static const _knownResources = {
-    'Bundle', 'Patient', 'Observation', 'Condition', 'Encounter',
-    'Procedure', 'MedicationRequest', 'DiagnosticReport', 'Immunization',
-    'AllergyIntolerance', 'Composition', 'DocumentReference', 'Organization',
-    'Practitioner', 'CarePlan', 'Coverage', 'Claim',
+    'Bundle',
+    'Patient',
+    'Observation',
+    'Condition',
+    'Encounter',
+    'Procedure',
+    'MedicationRequest',
+    'DiagnosticReport',
+    'Immunization',
+    'AllergyIntolerance',
+    'Composition',
+    'DocumentReference',
+    'Organization',
+    'Practitioner',
+    'CarePlan',
+    'Coverage',
+    'Claim',
   };
 
   @override
@@ -56,10 +69,12 @@ final class XmlFhirParser implements DocumentParser {
     final warnings = <ParseWarning>[];
     if (root.getAttribute('xmlns')?.contains(_fhirNamespace) != true &&
         !_knownResources.contains(resourceType)) {
-      warnings.add(const ParseWarning(
-        'fhir.namespace_absent',
-        'root is not in the FHIR namespace; classification is heuristic',
-      ));
+      warnings.add(
+        const ParseWarning(
+          'fhir.namespace_absent',
+          'root is not in the FHIR namespace; classification is heuristic',
+        ),
+      );
     }
 
     return ParseResult(
@@ -79,4 +94,3 @@ final class XmlFhirParser implements DocumentParser {
 
   String? _orNull(String s) => s.isEmpty ? null : s;
 }
-

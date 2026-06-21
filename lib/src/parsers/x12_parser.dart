@@ -25,7 +25,9 @@ final class X12Parser implements DocumentParser {
   @override
   bool canParse(Uint8List bytes) {
     if (bytes.length < _isaLength) return false;
-    if (bytes[0] != 0x49 || bytes[1] != 0x53 || bytes[2] != 0x41) return false; // ISA
+    if (bytes[0] != 0x49 || bytes[1] != 0x53 || bytes[2] != 0x41) {
+      return false; // ISA
+    }
     final sep = bytes[3];
     return !_isAlnum(sep) && sep != 0x20;
   }

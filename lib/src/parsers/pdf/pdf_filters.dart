@@ -15,7 +15,9 @@ import '../../core/parse_exception.dart';
 /// Inflates a FlateDecode stream (zlib wrapper; falls back to raw deflate).
 Uint8List inflate(Uint8List data) {
   try {
-    return Uint8List.fromList(const ZLibDecoder().decodeBytes(data, verify: false));
+    return Uint8List.fromList(
+      const ZLibDecoder().decodeBytes(data, verify: false),
+    );
   } catch (_) {
     try {
       return Uint8List.fromList(Inflate(data).getBytes());
@@ -95,11 +97,20 @@ Uint8List ascii85Decode(Uint8List data) {
   while (i < data.length) {
     final c = data[i++];
     if (c == 0x7E) break; // '~' → '~>' EOD
-    if (c == 0x20 || c == 0x0A || c == 0x0D || c == 0x09 || c == 0x00 || c == 0x0C) {
+    if (c == 0x20 ||
+        c == 0x0A ||
+        c == 0x0D ||
+        c == 0x09 ||
+        c == 0x00 ||
+        c == 0x0C) {
       continue;
     }
     if (c == 0x7A && count == 0) {
-      out..addByte(0)..addByte(0)..addByte(0)..addByte(0); // 'z'
+      out
+        ..addByte(0)
+        ..addByte(0)
+        ..addByte(0)
+        ..addByte(0); // 'z'
       continue;
     }
     if (c < 0x21 || c > 0x75) continue;
@@ -164,7 +175,11 @@ Uint8List lzwDecode(Uint8List data, {int earlyChange = 1}) {
 
   late List<List<int>> table;
   void reset() {
-    table = [for (var i = 0; i < 256; i++) [i], <int>[], <int>[]];
+    table = [
+      for (var i = 0; i < 256; i++) [i],
+      <int>[],
+      <int>[],
+    ];
   }
 
   reset();
@@ -222,12 +237,17 @@ Uint8List applyPredictor(
   int columns,
 ) {
   if (predictor < 2) return data;
-  final bytesPerPixel = ((colors * bitsPerComponent + 7) ~/ 8).clamp(1, 1 << 24);
+  final bytesPerPixel = ((colors * bitsPerComponent + 7) ~/ 8).clamp(
+    1,
+    1 << 24,
+  );
   final rowBytes = (colors * bitsPerComponent * columns + 7) ~/ 8;
   if (rowBytes <= 0) return data;
 
   if (predictor == 2) {
-    if (bitsPerComponent != 8) return data; // sub-byte TIFF prediction unsupported
+    if (bitsPerComponent != 8) {
+      return data; // sub-byte TIFF prediction unsupported
+    }
     final out = Uint8List.fromList(data);
     final rows = out.length ~/ rowBytes;
     for (var r = 0; r < rows; r++) {

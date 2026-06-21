@@ -42,13 +42,13 @@ final class ParseResult {
   bool get hasText => text != null && text!.isNotEmpty;
 
   Map<String, Object?> toJson() => {
-        'documentId': documentId,
-        'format': format.name,
-        'byteLength': byteLength,
-        'metadata': metadata,
-        'text': text,
-        'warnings': warnings.map((w) => w.toJson()).toList(),
-      };
+    'documentId': documentId,
+    'format': format.name,
+    'byteLength': byteLength,
+    'metadata': metadata,
+    'text': text,
+    'warnings': warnings.map((w) => w.toJson()).toList(),
+  };
 
   @override
   String toString() =>
@@ -70,8 +70,11 @@ final class ParseWarning {
   /// Byte offset, when known.
   final int? offset;
 
-  Map<String, Object?> toJson() =>
-      {'code': code, 'message': message, if (offset != null) 'offset': offset};
+  Map<String, Object?> toJson() => {
+    'code': code,
+    'message': message,
+    if (offset != null) 'offset': offset,
+  };
 
   @override
   String toString() => '[$code] $message';

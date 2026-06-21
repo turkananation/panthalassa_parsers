@@ -10,10 +10,12 @@ void main() {
   final reg = ParserRegistry.standard();
 
   test('FHIR JSON resource is detected and text extracted', () {
-    final r = reg.parse(u8('''
+    final r = reg.parse(
+      u8('''
 {"resourceType":"Patient","id":"p1",
  "name":[{"family":"Mwema","given":["Asha"]}],
- "meta":{"profile":["http://hl7.org/fhir/StructureDefinition/Patient"]}}'''));
+ "meta":{"profile":["http://hl7.org/fhir/StructureDefinition/Patient"]}}'''),
+    );
     expect(r.format, DocumentFormat.fhirJson);
     expect(r.metadata['resourceType'], 'Patient');
     expect(r.metadata['id'], 'p1');
@@ -22,9 +24,13 @@ void main() {
   });
 
   test('FHIR NDJSON bulk export counts records', () {
-    final r = reg.parse(u8('{"resourceType":"Patient","id":"a"}\n'
+    final r = reg.parse(
+      u8(
+        '{"resourceType":"Patient","id":"a"}\n'
         '{"resourceType":"Observation","id":"b"}\n'
-        '{"resourceType":"Patient","id":"c"}\n'));
+        '{"resourceType":"Patient","id":"c"}\n',
+      ),
+    );
     expect(r.format, DocumentFormat.fhirJson);
     expect(r.metadata['ndjson'], true);
     expect(r.metadata['recordCount'], 3);
@@ -32,13 +38,15 @@ void main() {
   });
 
   test('W3C Verifiable Credential (JSON-LD) is detected', () {
-    final r = reg.parse(u8('''
+    final r = reg.parse(
+      u8('''
 {"@context":["https://www.w3.org/2018/credentials/v1"],
  "type":["VerifiableCredential","UniversityDegreeCredential"],
  "issuer":{"id":"did:example:kenya-gov"},
  "issuanceDate":"2026-01-15T00:00:00Z",
  "credentialSubject":{"degree":{"name":"Bachelor of Civic Tech"}},
- "proof":{"type":"Ed25519Signature2020"}}'''));
+ "proof":{"type":"Ed25519Signature2020"}}'''),
+    );
     expect(r.format, DocumentFormat.verifiableCredential);
     expect(r.metadata['serialization'], 'json-ld');
     expect(r.metadata['issuer'], 'did:example:kenya-gov');
@@ -55,8 +63,8 @@ void main() {
       'sub': 'did:example:holder',
       'vc': {
         'type': ['VerifiableCredential'],
-        'credentialSubject': {'alumniOf': 'Turkana University'}
-      }
+        'credentialSubject': {'alumniOf': 'Turkana University'},
+      },
     });
     final jwt = '$header.$payload.c2lnbmF0dXJl';
     final r = reg.parse(u8(jwt));
@@ -72,12 +80,19 @@ void main() {
     final r = reg.parse(u8('{"title":"Quarterly Report","items":["a","b"]}'));
     expect(r.format, DocumentFormat.json);
     expect(r.text, contains('Quarterly Report'));
-    expect((r.metadata['topLevelKeys'] as List), containsAll(['title', 'items']));
+    expect(
+      (r.metadata['topLevelKeys'] as List),
+      containsAll(['title', 'items']),
+    );
   });
 
   test('NIEM JSON profile is recognised', () {
-    final r = reg.parse(u8('{"@context":{"nc":"http://release.niem.gov/niem/niem-core/5.0/"},'
-        '"nc:Person":{"nc:PersonName":{"nc:PersonFullName":"Wanjiru Kamau"}}}'));
+    final r = reg.parse(
+      u8(
+        '{"@context":{"nc":"http://release.niem.gov/niem/niem-core/5.0/"},'
+        '"nc:Person":{"nc:PersonName":{"nc:PersonFullName":"Wanjiru Kamau"}}}',
+      ),
+    );
     expect(r.format, DocumentFormat.niem);
     expect(r.metadata['profile'], 'NIEM JSON');
     expect(r.text, contains('Wanjiru Kamau'));

@@ -17,10 +17,23 @@ import '../core/parse_result.dart';
 final class UsmtfParser implements DocumentParser {
   const UsmtfParser();
 
-  static final _setLine = RegExp(r'^[A-Z][A-Z0-9]{1,9}/.*//\s*$', multiLine: true);
+  static final _setLine = RegExp(
+    r'^[A-Z][A-Z0-9]{1,9}/.*//\s*$',
+    multiLine: true,
+  );
   static const _commonSetIds = {
-    'MSGID', 'EXER', 'REF', 'AMPN', 'NARR', 'GENTEXT', 'SITREP', 'UNITLOCS',
-    'PERSTAT', 'TASKORG', 'COORD', 'AKNLDG',
+    'MSGID',
+    'EXER',
+    'REF',
+    'AMPN',
+    'NARR',
+    'GENTEXT',
+    'SITREP',
+    'UNITLOCS',
+    'PERSTAT',
+    'TASKORG',
+    'COORD',
+    'AKNLDG',
   };
   static const _minSetLines = 2;
 
@@ -93,7 +106,9 @@ final class UsmtfParser implements DocumentParser {
   }
 
   String? _peek(Uint8List bytes, int max) {
-    final slice = bytes.length <= max ? bytes : Uint8List.sublistView(bytes, 0, max);
+    final slice = bytes.length <= max
+        ? bytes
+        : Uint8List.sublistView(bytes, 0, max);
     return ascii.decode(slice, allowInvalid: true);
   }
 }

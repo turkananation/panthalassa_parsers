@@ -13,8 +13,10 @@ void main() {
     test('id is deterministic for identical bytes', () {
       final a = utf8.encode('UNB+UNOA:1+SENDER+RECIPIENT+200101:1200+1\'');
       const hasher = PqBytesContentHasher();
-      expect(hasher.idFor(Uint8List.fromList(a)),
-          hasher.idFor(Uint8List.fromList([...a])));
+      expect(
+        hasher.idFor(Uint8List.fromList(a)),
+        hasher.idFor(Uint8List.fromList([...a])),
+      );
     });
 
     test('a one-bit change yields a different id (tamper-evidence)', () {
@@ -47,8 +49,10 @@ void main() {
 
     test('parse throws UnsupportedFormatException on unknown input', () {
       final noise = Uint8List.fromList(List.filled(32, 0x42));
-      expect(() => registry.parse(noise),
-          throwsA(isA<UnsupportedFormatException>()));
+      expect(
+        () => registry.parse(noise),
+        throwsA(isA<UnsupportedFormatException>()),
+      );
     });
   });
 }

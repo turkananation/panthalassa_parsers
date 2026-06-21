@@ -10,8 +10,9 @@ import '../core/parse_exception.dart';
 /// bearing attributes used by FHIR (`value`) and CDA (`displayName`)).
 class XmlSupport {
   static String? peek(Uint8List bytes, int max) {
-    final slice =
-        bytes.length <= max ? bytes : Uint8List.sublistView(bytes, 0, max);
+    final slice = bytes.length <= max
+        ? bytes
+        : Uint8List.sublistView(bytes, 0, max);
     try {
       return utf8.decode(slice, allowMalformed: true);
     } on FormatException {

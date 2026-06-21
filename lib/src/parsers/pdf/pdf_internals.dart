@@ -148,21 +148,34 @@ class _ValueParser {
         if (pos >= src.length) break;
         final e = src[pos++];
         switch (e) {
-          case 'n': out.add(0x0A);
-          case 'r': out.add(0x0D);
-          case 't': out.add(0x09);
-          case 'b': out.add(0x08);
-          case 'f': out.add(0x0C);
-          case '(': out.add(0x28);
-          case ')': out.add(0x29);
-          case '\\': out.add(0x5C);
-          case '\n': break; // line continuation
+          case 'n':
+            out.add(0x0A);
+          case 'r':
+            out.add(0x0D);
+          case 't':
+            out.add(0x09);
+          case 'b':
+            out.add(0x08);
+          case 'f':
+            out.add(0x0C);
+          case '(':
+            out.add(0x28);
+          case ')':
+            out.add(0x29);
+          case '\\':
+            out.add(0x5C);
+          case '\n':
+            break; // line continuation
           case '\r':
             if (pos < src.length && src[pos] == '\n') pos++;
           default:
             if (_isOctal(e)) {
               var oct = e;
-              for (var k = 0; k < 2 && pos < src.length && _isOctal(src[pos]); k++) {
+              for (
+                var k = 0;
+                k < 2 && pos < src.length && _isOctal(src[pos]);
+                k++
+              ) {
                 oct += src[pos++];
               }
               out.add(int.parse(oct, radix: 8) & 0xFF);
@@ -259,7 +272,9 @@ class _ValueParser {
   PdfNumber? _readNumberToken() {
     final b = StringBuffer();
     var real = false;
-    if (pos < src.length && (src[pos] == '+' || src[pos] == '-')) b.write(src[pos++]);
+    if (pos < src.length && (src[pos] == '+' || src[pos] == '-')) {
+      b.write(src[pos++]);
+    }
     while (pos < src.length) {
       final c = src[pos];
       if (_isDigit(c)) {
@@ -321,13 +336,20 @@ class _ValueParser {
     return b.toString();
   }
 
-  static bool _isDigit(String c) => c.codeUnitAt(0) >= 0x30 && c.codeUnitAt(0) <= 0x39;
-  static bool _isOctal(String c) => c.codeUnitAt(0) >= 0x30 && c.codeUnitAt(0) <= 0x37;
+  static bool _isDigit(String c) =>
+      c.codeUnitAt(0) >= 0x30 && c.codeUnitAt(0) <= 0x39;
+  static bool _isOctal(String c) =>
+      c.codeUnitAt(0) >= 0x30 && c.codeUnitAt(0) <= 0x37;
 }
 
 /// A parsed PDF document backed by a brute-force object index.
 class PdfDocument {
-  PdfDocument._(this.version, this._objects, this.trailer, {this.encryptionLabel});
+  PdfDocument._(
+    this.version,
+    this._objects,
+    this.trailer, {
+    this.encryptionLabel,
+  });
 
   final String version;
   final Map<int, PdfObject> _objects;
@@ -440,8 +462,12 @@ class PdfDocument {
       }
     }
 
-    return PdfDocument._(version, objects, trailer,
-        encryptionLabel: encryptionLabel);
+    return PdfDocument._(
+      version,
+      objects,
+      trailer,
+      encryptionLabel: encryptionLabel,
+    );
   }
 
   static PdfObject? _resolveIn(PdfObject? o, Map<int, PdfObject> objects) {
@@ -453,7 +479,10 @@ class PdfDocument {
     return c;
   }
 
-  static Uint8List? _firstIdBytes(PdfObject? idObj, Map<int, PdfObject> objects) {
+  static Uint8List? _firstIdBytes(
+    PdfObject? idObj,
+    Map<int, PdfObject> objects,
+  ) {
     final id = _resolveIn(idObj, objects);
     if (id is PdfArray && id.items.isNotEmpty) {
       final first = _resolveIn(id.items.first, objects);
@@ -562,7 +591,7 @@ class PdfDocument {
     }
     final pagesRoot = resolve(cat['Pages']);
     if (pagesRoot is PdfDict) {
-      _walkPageTree(pagesRoot, null, result, 0);
+      _walkPageTree(pagesRoot, null, null, null, result, 0);
     }
     if (result.isEmpty) {
       for (final o in _objects.values) {
@@ -573,17 +602,32 @@ class PdfDocument {
   }
 
   void _walkPageTree(
-      PdfDict node, PdfDict? inheritedResources, List<PdfDict> out, int depth) {
+    PdfDict node,
+    PdfDict? inheritedResources,
+    PdfObject? inheritedMediaBox,
+    PdfObject? inheritedCropBox,
+    List<PdfDict> out,
+    int depth,
+  ) {
     if (depth > 64) return; // cycle guard
     final resources = resolve(node['Resources']);
-    final effectiveResources =
-        resources is PdfDict ? resources : inheritedResources;
+    final effectiveResources = resources is PdfDict
+        ? resources
+        : inheritedResources;
+    final effectiveMediaBox = node['MediaBox'] ?? inheritedMediaBox;
+    final effectiveCropBox = node['CropBox'] ?? inheritedCropBox;
 
     if (_nameEquals(node['Type'], 'Page') ||
         (node['Contents'] != null && node['Kids'] == null)) {
       final page = Map<String, PdfObject>.from(node.entries);
       if (page['Resources'] == null && effectiveResources != null) {
         page['Resources'] = effectiveResources;
+      }
+      if (page['MediaBox'] == null && effectiveMediaBox != null) {
+        page['MediaBox'] = effectiveMediaBox;
+      }
+      if (page['CropBox'] == null && effectiveCropBox != null) {
+        page['CropBox'] = effectiveCropBox;
       }
       out.add(PdfDict(page));
       return;
@@ -593,7 +637,14 @@ class PdfDocument {
       for (final kid in kids.items) {
         final k = resolve(kid);
         if (k is PdfDict) {
-          _walkPageTree(k, effectiveResources, out, depth + 1);
+          _walkPageTree(
+            k,
+            effectiveResources,
+            effectiveMediaBox,
+            effectiveCropBox,
+            out,
+            depth + 1,
+          );
         }
       }
     }
@@ -671,7 +722,9 @@ class PdfDocument {
     if (parmsObj is PdfArray) {
       return [
         for (var i = 0; i < filterCount; i++)
-          i < parmsObj.items.length ? _parmsToMap(res(parmsObj.items[i])) : null,
+          i < parmsObj.items.length
+              ? _parmsToMap(res(parmsObj.items[i]))
+              : null,
       ];
     }
     final single = _parmsToMap(parmsObj);
@@ -682,7 +735,11 @@ class PdfDocument {
     if (p is! PdfDict) return null;
     final m = <String, int>{};
     for (final key in const [
-      'Predictor', 'Colors', 'BitsPerComponent', 'Columns', 'EarlyChange',
+      'Predictor',
+      'Colors',
+      'BitsPerComponent',
+      'Columns',
+      'EarlyChange',
     ]) {
       final v = p[key];
       if (v is PdfNumber) m[key] = v.value.toInt();

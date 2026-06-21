@@ -8,6 +8,7 @@ import '../core/parse_exception.dart';
 import '../core/parse_result.dart';
 import 'pdf/pdf_internals.dart';
 import 'pdf/pdf_text.dart';
+import 'pdf/pdf_visual.dart';
 
 /// Public parser for PDF documents.
 ///
@@ -52,21 +53,25 @@ final class PdfParser implements DocumentParser {
       try {
         pageTexts.add(ContentTextExtractor.extractPage(doc, page));
       } catch (e) {
-        warnings.add(ParseWarning(
-          'pdf.page_extract_failed',
-          'a page could not be extracted: $e',
-        ));
+        warnings.add(
+          ParseWarning(
+            'pdf.page_extract_failed',
+            'a page could not be extracted: $e',
+          ),
+        );
         pageTexts.add('');
       }
     }
 
     final pageText = pageTexts.join('\n\f\n').trim();
     if (pages.isNotEmpty && pageText.isEmpty) {
-      warnings.add(const ParseWarning(
-        'pdf.no_text_extracted',
-        'pages found but no text recovered; the document may use a scanned '
-            'image layer or CID fonts without ToUnicode',
-      ));
+      warnings.add(
+        const ParseWarning(
+          'pdf.no_text_extracted',
+          'pages found but no text recovered; the document may use a scanned '
+              'image layer or CID fonts without ToUnicode',
+        ),
+      );
     }
 
     // PDF/A-3 (and PDF 2.0) can carry associated files — e.g. the hybrid
@@ -76,8 +81,8 @@ final class PdfParser implements DocumentParser {
     final text = embedded.text.isEmpty
         ? pageText
         : (pageText.isEmpty
-            ? embedded.text
-            : '$pageText\n\f\n${embedded.text}');
+              ? embedded.text
+              : '$pageText\n\f\n${embedded.text}');
 
     final info = doc.info;
     String? infoString(String key) {
@@ -92,6 +97,7 @@ final class PdfParser implements DocumentParser {
     final permissions = permissionsValue is PdfNumber
         ? _permissionFlags(permissionsValue.value.toInt())
         : null;
+    final visualPages = PdfVisualExtractor.extract(doc, pages);
 
     return ParseResult(
       documentId: hasher.idFor(bytes),
@@ -100,6 +106,7 @@ final class PdfParser implements DocumentParser {
       metadata: {
         'pdfVersion': doc.version,
         'pageCount': pages.length,
+        if (visualPages.isNotEmpty) 'visualPages': visualPages,
         if (infoString('Title') != null) 'title': infoString('Title'),
         if (infoString('Author') != null) 'author': infoString('Author'),
         if (infoString('Subject') != null) 'subject': infoString('Subject'),
@@ -124,22 +131,22 @@ final class PdfParser implements DocumentParser {
 
   /// Decodes the Standard security handler permission bits (PDF 7.6.3.2).
   Map<String, bool> _permissionFlags(int p) => {
-        'print': p & (1 << 2) != 0,
-        'modify': p & (1 << 3) != 0,
-        'copy': p & (1 << 4) != 0,
-        'annotate': p & (1 << 5) != 0,
-        'fillForms': p & (1 << 8) != 0,
-        'extractAccessibility': p & (1 << 9) != 0,
-        'assemble': p & (1 << 10) != 0,
-        'printHighRes': p & (1 << 11) != 0,
-      };
+    'print': p & (1 << 2) != 0,
+    'modify': p & (1 << 3) != 0,
+    'copy': p & (1 << 4) != 0,
+    'annotate': p & (1 << 5) != 0,
+    'fillForms': p & (1 << 8) != 0,
+    'extractAccessibility': p & (1 << 9) != 0,
+    'assemble': p & (1 << 10) != 0,
+    'printHighRes': p & (1 << 11) != 0,
+  };
 
   /// Collects embedded files from the catalog `/Names /EmbeddedFiles` name tree
   /// and the `/AF` associated-files array, returning their metadata, any text
   /// recovered from XML/JSON/text payloads, and whether associated files exist
   /// (the PDF/A-3 signal).
   ({List<Map<String, Object?>> files, String text, bool hasAssociatedFiles})
-      _extractEmbeddedFiles(PdfDocument doc) {
+  _extractEmbeddedFiles(PdfDocument doc) {
     final cat = doc.catalog;
     if (cat == null) {
       return (files: const [], text: '', hasAssociatedFiles: false);
@@ -200,8 +207,12 @@ final class PdfParser implements DocumentParser {
     );
   }
 
-  void _walkNameTree(PdfDocument doc, PdfDict node,
-      void Function(PdfObject?) onValue, int depth) {
+  void _walkNameTree(
+    PdfDocument doc,
+    PdfDict node,
+    void Function(PdfObject?) onValue,
+    int depth,
+  ) {
     if (depth > 32) return;
     final names = doc.resolve(node['Names']);
     if (names is PdfArray) {

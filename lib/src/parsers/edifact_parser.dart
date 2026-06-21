@@ -50,13 +50,20 @@ final class EdifactParser implements DocumentParser {
       orElse: () => const _Segment('UNB', []),
     );
     if (unb.elements.isEmpty) {
-      warnings.add(const ParseWarning(
-        'edifact.missing_unb', 'interchange header (UNB) not found'));
+      warnings.add(
+        const ParseWarning(
+          'edifact.missing_unb',
+          'interchange header (UNB) not found',
+        ),
+      );
     }
 
     final messageTypes = segments
         .where((s) => s.tag == 'UNH')
-        .map((s) => s.elements.length > 1 ? s.elements[1].join(delims.component) : '')
+        .map(
+          (s) =>
+              s.elements.length > 1 ? s.elements[1].join(delims.component) : '',
+        )
         .where((s) => s.isNotEmpty)
         .toList();
 
@@ -73,7 +80,10 @@ final class EdifactParser implements DocumentParser {
         'messageTypes': messageTypes,
       },
       text: segments
-          .map((s) => '${s.tag}: ${s.elements.map((e) => e.join('/')).join(' | ')}')
+          .map(
+            (s) =>
+                '${s.tag}: ${s.elements.map((e) => e.join('/')).join(' | ')}',
+          )
           .join('\n'),
       warnings: warnings,
     );
@@ -89,9 +99,13 @@ final class EdifactParser implements DocumentParser {
       // would be consumed by the first pass and fail to protect inner
       // separators (e.g. "ACME?+CO" must stay a single value "ACME+CO").
       final elements = _split(trimmed, d.element, d.release)
-          .map((e) => _split(e, d.component, d.release)
-              .map((c) => _unescape(c, d.release))
-              .toList())
+          .map(
+            (e) => _split(
+              e,
+              d.component,
+              d.release,
+            ).map((c) => _unescape(c, d.release)).toList(),
+          )
           .toList();
       final tag = elements.isNotEmpty && elements.first.isNotEmpty
           ? elements.first.first
@@ -111,7 +125,9 @@ final class EdifactParser implements DocumentParser {
     while (i < input.length) {
       final ch = input[i];
       if (ch == release && i + 1 < input.length) {
-        current..write(ch)..write(input[i + 1]);
+        current
+          ..write(ch)
+          ..write(input[i + 1]);
         i += 2;
         continue;
       }
@@ -147,7 +163,9 @@ final class EdifactParser implements DocumentParser {
   }
 
   String? _peek(Uint8List bytes, int max) {
-    final slice = bytes.length <= max ? bytes : Uint8List.sublistView(bytes, 0, max);
+    final slice = bytes.length <= max
+        ? bytes
+        : Uint8List.sublistView(bytes, 0, max);
     return latin1.decode(slice, allowInvalid: true);
   }
 }

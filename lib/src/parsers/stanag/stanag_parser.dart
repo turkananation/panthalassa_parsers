@@ -9,6 +9,8 @@ import '../../core/parse_exception.dart';
 import '../../core/parse_result.dart';
 import 'stanag_4607_gmti.dart';
 import 'stanag_4609_motion_imagery.dart';
+import 'stanag_5516_link16.dart';
+import 'stanag_7023_npif.dart';
 import 'stanag_xml.dart';
 
 /// Dispatching parser for the STANAG family.
@@ -28,11 +30,13 @@ final class StanagParser implements DocumentParser {
   const StanagParser([this._subParsers = _defaults]);
 
   static const List<StanagSubParser> _defaults = [
-    Stanag4607GmtiParser(),          // binary GMTI packet
+    Stanag4607GmtiParser(), // binary GMTI packet
     Stanag4609MotionImageryParser(), // MPEG-2 TS / MISB KLV
-    Stanag4676TrackingParser(),      // NITS tracking (XML/GML)
-    Stanag4774LabelParser(),         // confidentiality label (XML)
-    Stanag4778BindingParser(),       // metadata binding (XML)
+    Stanag7023NpifParser(), // NPIF imagery container
+    Stanag5516Link16Parser(), // conservative Link 16 framing
+    Stanag4676TrackingParser(), // NITS tracking (XML/GML)
+    Stanag4774LabelParser(), // confidentiality label (XML)
+    Stanag4778BindingParser(), // metadata binding (XML)
   ];
 
   final List<StanagSubParser> _subParsers;

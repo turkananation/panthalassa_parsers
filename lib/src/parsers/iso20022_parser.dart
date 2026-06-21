@@ -14,8 +14,9 @@ final class Iso20022Parser implements DocumentParser {
   const Iso20022Parser();
 
   static const _namespaceRoot = 'urn:iso:std:iso:20022';
-  static final _messageId =
-      RegExp(r'urn:iso:std:iso:20022:tech:xsd:([A-Za-z]+\.\d+\.\d+\.\d+)');
+  static final _messageId = RegExp(
+    r'urn:iso:std:iso:20022:tech:xsd:([A-Za-z]+\.\d+\.\d+\.\d+)',
+  );
 
   @override
   DocumentFormat get format => DocumentFormat.iso20022;

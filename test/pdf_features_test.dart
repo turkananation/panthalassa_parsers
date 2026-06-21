@@ -28,14 +28,17 @@ void main() {
     expect(r.text, contains('Nested Form Text'));
   });
 
-  test('inline image (BI/ID/EI) is skipped without corrupting surrounding text', () {
-    final r = registry.parse(buildInlineImagePdf());
-    expect(r.format, DocumentFormat.pdf);
-    expect(r.text, contains('Before Image'));
-    expect(r.text, contains('After Image'));
-    // The bait bytes inside the image ("BT", "(x)") must not leak into output.
-    expect(r.text, isNot(contains('(x)')));
-  });
+  test(
+    'inline image (BI/ID/EI) is skipped without corrupting surrounding text',
+    () {
+      final r = registry.parse(buildInlineImagePdf());
+      expect(r.format, DocumentFormat.pdf);
+      expect(r.text, contains('Before Image'));
+      expect(r.text, contains('After Image'));
+      // The bait bytes inside the image ("BT", "(x)") must not leak into output.
+      expect(r.text, isNot(contains('(x)')));
+    },
+  );
 
   _pdfA3Tests();
 }
@@ -43,18 +46,21 @@ void main() {
 // Appended: PDF/A-3 embedded-file extraction.
 void _pdfA3Tests() {
   final registry = ParserRegistry.standard();
-  test('PDF/A-3 associated embedded XML is detected and its text harvested', () {
-    final r = registry.parse(buildPdfA3WithEmbeddedXml());
-    expect(r.format, DocumentFormat.pdf);
-    expect(r.metadata['pdfA3'], true);
-    final files = r.metadata['embeddedFiles'] as List;
-    expect(files, hasLength(1));
-    final f = files.first as Map;
-    expect(f['name'], 'factur-x.xml');
-    expect(f['relationship'], 'Alternative');
-    // Both the page text and the embedded invoice XML are present.
-    expect(r.text, contains('Invoice 2026-001'));
-    expect(r.text, contains('Esambo Interserve Ltd'));
-    expect(r.text, contains('1500.00'));
-  });
+  test(
+    'PDF/A-3 associated embedded XML is detected and its text harvested',
+    () {
+      final r = registry.parse(buildPdfA3WithEmbeddedXml());
+      expect(r.format, DocumentFormat.pdf);
+      expect(r.metadata['pdfA3'], true);
+      final files = r.metadata['embeddedFiles'] as List;
+      expect(files, hasLength(1));
+      final f = files.first as Map;
+      expect(f['name'], 'factur-x.xml');
+      expect(f['relationship'], 'Alternative');
+      // Both the page text and the embedded invoice XML are present.
+      expect(r.text, contains('Invoice 2026-001'));
+      expect(r.text, contains('Esambo Interserve Ltd'));
+      expect(r.text, contains('1500.00'));
+    },
+  );
 }

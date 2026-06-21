@@ -35,33 +35,31 @@ import 'parse_result.dart';
 /// ```
 final class ParserRegistry {
   ParserRegistry(this._parsers, {ContentHasher? hasher})
-      : _hasher = hasher ?? const PqBytesContentHasher(),
-        _detector = FormatDetector(_parsers);
+    : _hasher = hasher ?? const PqBytesContentHasher(),
+      _detector = FormatDetector(_parsers);
 
   /// Registers every built-in parser in detection-priority order
   /// (strong binary magic first, permissive text heuristics last).
-  factory ParserRegistry.standard({ContentHasher? hasher}) => ParserRegistry(
-        const [
-          DicomParser(),
-          PdfParser(),
-          NitfParser(),
-          StanagParser(),
-          OdfParser(),
-          Hl7V2Parser(),
-          X12Parser(),
-          EdifactParser(),
-          StepParser(),
-          VerifiableCredentialParser(),
-          FhirJsonParser(),
-          Iso20022Parser(),
-          CdaParser(),
-          XmlFhirParser(),
-          JsonStructuredParser(),
-          XmlStructuredParser(),
-          UsmtfParser(),
-        ],
-        hasher: hasher,
-      );
+  factory ParserRegistry.standard({ContentHasher? hasher}) =>
+      ParserRegistry(const [
+        DicomParser(),
+        PdfParser(),
+        NitfParser(),
+        StanagParser(),
+        OdfParser(),
+        Hl7V2Parser(),
+        X12Parser(),
+        EdifactParser(),
+        StepParser(),
+        VerifiableCredentialParser(),
+        FhirJsonParser(),
+        Iso20022Parser(),
+        CdaParser(),
+        XmlFhirParser(),
+        JsonStructuredParser(),
+        XmlStructuredParser(),
+        UsmtfParser(),
+      ], hasher: hasher);
 
   final List<DocumentParser> _parsers;
   final FormatDetector _detector;

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.0-dev
+
+- STANAG depth: 4607 Dwell/target body fields, 4609 MISB ST 0601 local-set TLVs,
+  4676 per-track-point kinematics, new 7023 NPIF parser, and conservative 5516
+  Link 16 framed-message metadata.
+- Binary depth: DICOM SQ descent with undefined-length item handling,
+  multi-valued attribute rendering, broader dictionary-backed metadata, and
+  generic attribute lists; NITF image/graphic/text/DES/RES segment
+  subheader/body walking.
+- Hardening: malformed-input parser tests, environment-gated real-file
+  conformance harness, benchmark entrypoint, web compile smoke target, CI, and
+  stable issue-code documentation.
+- Render engine start: pure-Dart `DocumentIr`, capability flags, renderer SPI,
+  text/Markdown/escaped-HTML renderers, visual display-list primitives, SVG
+  visual preview output, PDF page geometry/simple visual commands, and
+  DICOM/NITF visual placeholders.
+
 ## 0.4.0
 
 Closes the Panthalassa formats matrix — every advertised standard now has a parser.

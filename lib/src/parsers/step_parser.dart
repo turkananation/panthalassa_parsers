@@ -25,7 +25,8 @@ final class StepParser implements DocumentParser {
   @override
   bool canParse(Uint8List bytes) {
     final p = _peek(bytes, 64);
-    return p != null && p.replaceAll(RegExp(r'\s'), '').startsWith('ISO-10303-21;');
+    return p != null &&
+        p.replaceAll(RegExp(r'\s'), '').startsWith('ISO-10303-21;');
   }
 
   @override
@@ -39,7 +40,9 @@ final class StepParser implements DocumentParser {
 
     final clean = _stripComments(source);
     if (!clean.contains(_magic)) {
-      throw const MalformedDocumentException('missing ISO-10303-21 header token');
+      throw const MalformedDocumentException(
+        'missing ISO-10303-21 header token',
+      );
     }
 
     final statements = _splitStatements(clean);
@@ -89,11 +92,12 @@ final class StepParser implements DocumentParser {
     }
 
     // Top entity types by frequency, for a quick structural fingerprint.
-    final topEntities = (entityCounts.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value)))
-        .take(10)
-        .map((e) => {'entity': e.key, 'count': e.value})
-        .toList();
+    final topEntities =
+        (entityCounts.entries.toList()
+              ..sort((a, b) => b.value.compareTo(a.value)))
+            .take(10)
+            .map((e) => {'entity': e.key, 'count': e.value})
+            .toList();
 
     return ParseResult(
       documentId: hasher.idFor(bytes),
@@ -110,7 +114,8 @@ final class StepParser implements DocumentParser {
     );
   }
 
-  String _stripComments(String s) => s.replaceAll(RegExp(r'/\*.*?\*/', dotAll: true), ' ');
+  String _stripComments(String s) =>
+      s.replaceAll(RegExp(r'/\*.*?\*/', dotAll: true), ' ');
 
   /// Splits on `;` while ignoring semicolons inside single-quoted strings.
   List<String> _splitStatements(String s) {
@@ -152,7 +157,9 @@ final class StepParser implements DocumentParser {
   }
 
   String? _peek(Uint8List bytes, int max) {
-    final slice = bytes.length <= max ? bytes : Uint8List.sublistView(bytes, 0, max);
+    final slice = bytes.length <= max
+        ? bytes
+        : Uint8List.sublistView(bytes, 0, max);
     return latin1.decode(slice, allowInvalid: true);
   }
 }

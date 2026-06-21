@@ -28,8 +28,11 @@ class JsonSupport {
   /// Appends every non-empty string scalar reachable in [node] to [out], one
   /// per line, in document order. Numbers/bools are skipped (usually flags or
   /// identifiers, not human text). Bounded to avoid pathological inputs.
-  static void collectText(Object? node, StringBuffer out,
-      {int maxNodes = 200000}) {
+  static void collectText(
+    Object? node,
+    StringBuffer out, {
+    int maxNodes = 200000,
+  }) {
     var budget = maxNodes;
     void walk(Object? n) {
       if (budget-- <= 0) return;
@@ -50,8 +53,9 @@ class JsonSupport {
 
   /// A small UTF-8 prefix for cheap detection, or `null` if not decodable.
   static String? peek(Uint8List bytes, int max) {
-    final slice =
-        bytes.length <= max ? bytes : Uint8List.sublistView(bytes, 0, max);
+    final slice = bytes.length <= max
+        ? bytes
+        : Uint8List.sublistView(bytes, 0, max);
     try {
       return utf8.decode(slice, allowMalformed: true);
     } on FormatException {
@@ -67,8 +71,9 @@ class JsonSupport {
 
   /// Matches a compact JWS/JWT: three base64url segments separated by dots
   /// (the signature segment may be empty for an unsecured token).
-  static final RegExp jwtShape =
-      RegExp(r'^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$');
+  static final RegExp jwtShape = RegExp(
+    r'^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$',
+  );
 
   /// Decodes a base64url segment (JWT header or payload) to a JSON map, or
   /// `null` if it is not valid base64url-encoded JSON.

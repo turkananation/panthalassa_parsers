@@ -23,7 +23,9 @@ final class Hl7V2Parser implements DocumentParser {
   @override
   bool canParse(Uint8List bytes) {
     if (bytes.length < 8) return false;
-    if (bytes[0] != 0x4D || bytes[1] != 0x53 || bytes[2] != 0x48) return false; // MSH
+    if (bytes[0] != 0x4D || bytes[1] != 0x53 || bytes[2] != 0x48) {
+      return false; // MSH
+    }
     final sep = bytes[3];
     // Field separator must be a delimiter, not a letter/digit/space.
     return !_isAlnum(sep) && sep != 0x20;
@@ -45,7 +47,9 @@ final class Hl7V2Parser implements DocumentParser {
         .where((s) => s.trim().isNotEmpty)
         .toList();
     if (segments.isEmpty || !segments.first.startsWith('MSH')) {
-      throw const MalformedDocumentException('no MSH segment in HL7 v2 message');
+      throw const MalformedDocumentException(
+        'no MSH segment in HL7 v2 message',
+      );
     }
 
     final mshFields = segments.first.split(fieldSep);
@@ -62,9 +66,14 @@ final class Hl7V2Parser implements DocumentParser {
         for (final rep in fields[i].split(repetitionSep)) {
           for (final comp in rep.split(componentSep)) {
             for (final sub in comp.split(subSep)) {
-              final v = _deescape(sub, escapeChar, fieldSep, componentSep,
-                      subSep, repetitionSep)
-                  .trim();
+              final v = _deescape(
+                sub,
+                escapeChar,
+                fieldSep,
+                componentSep,
+                subSep,
+                repetitionSep,
+              ).trim();
               if (v.isNotEmpty) text.writeln(v);
             }
           }
@@ -82,7 +91,8 @@ final class Hl7V2Parser implements DocumentParser {
         if (msh(10) != null && msh(10)!.isNotEmpty) 'controlId': msh(10),
         if (msh(12) != null && msh(12)!.isNotEmpty) 'version': msh(12),
         if (msh(3) != null && msh(3)!.isNotEmpty) 'sendingApplication': msh(3),
-        if (msh(5) != null && msh(5)!.isNotEmpty) 'receivingApplication': msh(5),
+        if (msh(5) != null && msh(5)!.isNotEmpty)
+          'receivingApplication': msh(5),
         'segmentCount': segments.length,
         'segmentTypes': segmentCounts,
       },
@@ -91,8 +101,14 @@ final class Hl7V2Parser implements DocumentParser {
     );
   }
 
-  String _deescape(String s, String esc, String f, String c, String sub,
-      String rep) {
+  String _deescape(
+    String s,
+    String esc,
+    String f,
+    String c,
+    String sub,
+    String rep,
+  ) {
     if (!s.contains(esc)) return s;
     final e = RegExp.escape(esc);
     final out = s

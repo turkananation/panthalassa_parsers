@@ -62,10 +62,12 @@ final class FhirJsonParser implements DocumentParser {
 
     final warnings = <ParseWarning>[];
     if (resourceTypes.isEmpty) {
-      warnings.add(const ParseWarning(
-        'fhir.no_resource_type',
-        'no resourceType found; classification is heuristic',
-      ));
+      warnings.add(
+        const ParseWarning(
+          'fhir.no_resource_type',
+          'no resourceType found; classification is heuristic',
+        ),
+      );
     }
 
     final body = text.toString().trimRight();

@@ -15,8 +15,9 @@ import 'json_support.dart';
 final class JsonStructuredParser implements DocumentParser {
   const JsonStructuredParser();
 
-  static final _niemPrefixedKey =
-      RegExp(r'"(nc|j|em|hs|im|intel|scr|cbrn|mo|geo|ag):[A-Za-z]');
+  static final _niemPrefixedKey = RegExp(
+    r'"(nc|j|em|hs|im|intel|scr|cbrn|mo|geo|ag):[A-Za-z]',
+  );
 
   @override
   DocumentFormat get format => DocumentFormat.json;

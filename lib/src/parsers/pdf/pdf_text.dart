@@ -16,27 +16,34 @@ class ToUnicodeCMap {
     final map = <int, String>{};
     var codeLen = 1;
 
-    final cs = RegExp(r'begincodespacerange(.*?)endcodespacerange', dotAll: true)
-        .firstMatch(src);
+    final cs = RegExp(
+      r'begincodespacerange(.*?)endcodespacerange',
+      dotAll: true,
+    ).firstMatch(src);
     if (cs != null) {
       final hex = RegExp(r'<([0-9A-Fa-f]+)>').firstMatch(cs.group(1)!);
       if (hex != null) codeLen = (hex.group(1)!.length / 2).ceil().clamp(1, 2);
     }
 
-    for (final block
-        in RegExp(r'beginbfchar(.*?)endbfchar', dotAll: true).allMatches(src)) {
-      for (final m in RegExp(r'<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>')
-          .allMatches(block.group(1)!)) {
+    for (final block in RegExp(
+      r'beginbfchar(.*?)endbfchar',
+      dotAll: true,
+    ).allMatches(src)) {
+      for (final m in RegExp(
+        r'<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>',
+      ).allMatches(block.group(1)!)) {
         map[int.parse(m.group(1)!, radix: 16)] = _hexToString(m.group(2)!);
       }
     }
 
-    for (final block
-        in RegExp(r'beginbfrange(.*?)endbfrange', dotAll: true).allMatches(src)) {
+    for (final block in RegExp(
+      r'beginbfrange(.*?)endbfrange',
+      dotAll: true,
+    ).allMatches(src)) {
       final body = block.group(1)!;
       for (final m in RegExp(
-              r'<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>')
-          .allMatches(body)) {
+        r'<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>',
+      ).allMatches(body)) {
         final lo = int.parse(m.group(1)!, radix: 16);
         final hi = int.parse(m.group(2)!, radix: 16);
         var dst = int.parse(m.group(3)!, radix: 16);
@@ -45,8 +52,9 @@ class ToUnicodeCMap {
         }
       }
       for (final m in RegExp(
-              r'<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*\[(.*?)\]', dotAll: true)
-          .allMatches(body)) {
+        r'<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*\[(.*?)\]',
+        dotAll: true,
+      ).allMatches(body)) {
         final lo = int.parse(m.group(1)!, radix: 16);
         final dsts = RegExp(r'<([0-9A-Fa-f]+)>')
             .allMatches(m.group(3)!)
@@ -207,10 +215,16 @@ class ContentTextExtractor {
     }
   }
 
-  String _decode(FontInfo? font, Uint8List bytes) =>
-      font != null ? font.decode(bytes) : latin1.decode(bytes, allowInvalid: true);
+  String _decode(FontInfo? font, Uint8List bytes) => font != null
+      ? font.decode(bytes)
+      : latin1.decode(bytes, allowInvalid: true);
 
-  void _runXObject(String name, PdfDict resources, StringBuffer out, int depth) {
+  void _runXObject(
+    String name,
+    PdfDict resources,
+    StringBuffer out,
+    int depth,
+  ) {
     final xobjects = _doc.resolve(resources['XObject']);
     if (xobjects is! PdfDict) return;
     final xobj = _doc.resolve(xobjects[name]);
@@ -308,7 +322,12 @@ class ContentTextExtractor {
   int _skipWs(String s, int pos) {
     while (pos < s.length) {
       final c = s[pos];
-      if (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\x00' || c == '\f') {
+      if (c == ' ' ||
+          c == '\t' ||
+          c == '\r' ||
+          c == '\n' ||
+          c == '\x00' ||
+          c == '\f') {
         pos++;
       } else if (c == '%') {
         while (pos < s.length && s[pos] != '\n' && s[pos] != '\r') {
@@ -365,7 +384,16 @@ class ContentTextExtractor {
       if (c == '\\') {
         if (pos >= s.length) break;
         final e = s[pos];
-        const named = {'n': 10, 'r': 13, 't': 9, 'b': 8, 'f': 12, '(': 40, ')': 41, '\\': 92};
+        const named = {
+          'n': 10,
+          'r': 13,
+          't': 9,
+          'b': 8,
+          'f': 12,
+          '(': 40,
+          ')': 41,
+          '\\': 92,
+        };
         final code = e.codeUnitAt(0);
         if (named.containsKey(e)) {
           out.add(named[e]!);
@@ -378,12 +406,14 @@ class ContentTextExtractor {
         } else if (code >= 0x30 && code <= 0x37) {
           // \ddd octal, 1–3 digits
           var oct = '';
-          for (var k = 0;
-              k < 3 &&
-                  pos < s.length &&
-                  s[pos].codeUnitAt(0) >= 0x30 &&
-                  s[pos].codeUnitAt(0) <= 0x37;
-              k++) {
+          for (
+            var k = 0;
+            k < 3 &&
+                pos < s.length &&
+                s[pos].codeUnitAt(0) >= 0x30 &&
+                s[pos].codeUnitAt(0) <= 0x37;
+            k++
+          ) {
             oct += s[pos];
             pos++;
           }
@@ -439,7 +469,9 @@ class ContentTextExtractor {
     while (pos < s.length) {
       final c = s[pos];
       if ((c.codeUnitAt(0) >= 48 && c.codeUnitAt(0) <= 57) ||
-          c == '.' || c == '-' || c == '+') {
+          c == '.' ||
+          c == '-' ||
+          c == '+') {
         b.write(c);
         pos++;
       } else {
@@ -491,11 +523,24 @@ class ContentTextExtractor {
   }
 
   static bool _isWs(String c) =>
-      c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\x00' || c == '\f';
+      c == ' ' ||
+      c == '\t' ||
+      c == '\r' ||
+      c == '\n' ||
+      c == '\x00' ||
+      c == '\f';
 
   static bool _isDelim(String c) =>
-      c == '/' || c == '[' || c == ']' || c == '(' || c == ')' ||
-      c == '<' || c == '>' || c == '{' || c == '}' || c == '%';
+      c == '/' ||
+      c == '[' ||
+      c == ']' ||
+      c == '(' ||
+      c == ')' ||
+      c == '<' ||
+      c == '>' ||
+      c == '{' ||
+      c == '}' ||
+      c == '%';
 
   static bool _isNumStart(String c) {
     final u = c.codeUnitAt(0);
@@ -504,10 +549,26 @@ class ContentTextExtractor {
 }
 
 class _Operand {
-  _Operand.string(this.bytes) : name = null, number = null, array = null, _kind = 0;
-  _Operand.name(this.name) : bytes = null, number = null, array = null, _kind = 1;
-  _Operand.number(this.number) : bytes = null, name = null, array = null, _kind = 2;
-  _Operand.array(this.array) : bytes = null, name = null, number = null, _kind = 3;
+  _Operand.string(this.bytes)
+    : name = null,
+      number = null,
+      array = null,
+      _kind = 0;
+  _Operand.name(this.name)
+    : bytes = null,
+      number = null,
+      array = null,
+      _kind = 1;
+  _Operand.number(this.number)
+    : bytes = null,
+      name = null,
+      array = null,
+      _kind = 2;
+  _Operand.array(this.array)
+    : bytes = null,
+      name = null,
+      number = null,
+      _kind = 3;
 
   final Uint8List? bytes;
   final String? name;

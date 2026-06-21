@@ -18,6 +18,21 @@ final class Stanag4609MotionImageryParser implements StanagSubParser {
   static const _syncByte = 0x47;
   // SMPTE 336M Universal Label prefix used by all MISB KLV local/universal sets.
   static const _klvUniversalLabel = [0x06, 0x0E, 0x2B, 0x34];
+  static const _st0601LocalSetPrefix = [
+    0x06,
+    0x0E,
+    0x2B,
+    0x34,
+    0x02,
+    0x0B,
+    0x01,
+    0x01,
+    0x0E,
+    0x01,
+    0x03,
+    0x01,
+    0x01,
+  ];
   static const _maxPidsReported = 32;
 
   @override
@@ -44,8 +59,12 @@ final class Stanag4609MotionImageryParser implements StanagSubParser {
       packetCount++;
     }
 
-    final hasKlv = _containsSequence(bytes, _klvUniversalLabel);
+    final payload = _payloadBytes(bytes, packetSize, syncOffset);
+    final localSets = _decodeLocalSets(payload);
+    final hasKlv =
+        localSets.isNotEmpty || _containsSequence(payload, _klvUniversalLabel);
     final sortedPids = pids.toList()..sort();
+    final klvMetadata = _flattenKlvMetadata(localSets);
 
     return StanagParse(
       metadata: {
@@ -55,13 +74,20 @@ final class Stanag4609MotionImageryParser implements StanagSubParser {
         'distinctPidCount': pids.length,
         'pids': sortedPids.take(_maxPidsReported).toList(),
         'hasKlvMetadata': hasKlv,
+        if (localSets.isNotEmpty) 'klvLocalSetCount': localSets.length,
+        if (localSets.isNotEmpty)
+          'klvTags': localSets.expand((set) => set.keys).toSet().toList()
+            ..sort(),
+        ...klvMetadata,
       },
       text: null, // motion imagery essence, not prose
       warnings: hasKlv
           ? const []
           : const [
-              ParseWarning('stanag4609.no_klv',
-                  'no MISB KLV Universal Label found; metadata may be absent'),
+              ParseWarning(
+                'stanag4609.no_klv',
+                'no MISB KLV Universal Label found; metadata may be absent',
+              ),
             ],
     );
   }
@@ -100,4 +126,131 @@ final class Stanag4609MotionImageryParser implements StanagSubParser {
     }
     return false;
   }
+
+  Uint8List _payloadBytes(Uint8List bytes, int packetSize, int syncOffset) {
+    final out = BytesBuilder(copy: false);
+    for (var i = syncOffset; i + 4 <= bytes.length; i += packetSize) {
+      if (bytes[i] != _syncByte) break;
+      final adaptationControl = (bytes[i + 3] >> 4) & 0x03;
+      if (adaptationControl == 0 || adaptationControl == 2) continue;
+      var payloadStart = i + 4;
+      if (adaptationControl == 3) {
+        if (payloadStart >= bytes.length) continue;
+        final adaptationLength = bytes[payloadStart];
+        payloadStart += 1 + adaptationLength;
+      }
+      final packetEnd = (i + packetSize).clamp(0, bytes.length);
+      if (payloadStart < packetEnd) {
+        out.add(Uint8List.sublistView(bytes, payloadStart, packetEnd));
+      }
+    }
+    return out.toBytes();
+  }
+
+  List<Map<int, Uint8List>> _decodeLocalSets(Uint8List payload) {
+    final out = <Map<int, Uint8List>>[];
+    var searchAt = 0;
+    while (searchAt < payload.length) {
+      final ul = _indexOf(payload, _st0601LocalSetPrefix, searchAt);
+      if (ul == -1 || ul + 16 >= payload.length) break;
+      var at = ul + 16; // full 16-byte Universal Label.
+      final length = _readBerLength(payload, at);
+      if (length == null) break;
+      at = length.nextOffset;
+      final end = at + length.value;
+      if (end > payload.length) break;
+      out.add(_decodeLocalSet(Uint8List.sublistView(payload, at, end)));
+      searchAt = end;
+    }
+    return out;
+  }
+
+  Map<int, Uint8List> _decodeLocalSet(Uint8List bytes) {
+    final out = <int, Uint8List>{};
+    var at = 0;
+    while (at < bytes.length) {
+      final tag = bytes[at++];
+      final len = _readBerLength(bytes, at);
+      if (len == null) break;
+      at = len.nextOffset;
+      if (at + len.value > bytes.length) break;
+      out[tag] = Uint8List.sublistView(bytes, at, at + len.value);
+      at += len.value;
+    }
+    return out;
+  }
+
+  Map<String, Object?> _flattenKlvMetadata(
+    List<Map<int, Uint8List>> localSets,
+  ) {
+    if (localSets.isEmpty) return const {};
+    final first = localSets.first;
+    final out = <String, Object?>{};
+    void putAngle(int tag, String key) {
+      final v = first[tag];
+      if (v != null && v.length == 2) {
+        final raw = ByteData.sublistView(v).getUint16(0, Endian.big);
+        out[key] = _round(raw / 65535 * 360);
+      }
+    }
+
+    void putLat(int tag, String key) {
+      final v = first[tag];
+      if (v != null && v.length == 4) {
+        final raw = ByteData.sublistView(v).getInt32(0, Endian.big);
+        out[key] = _round(raw / 2147483647 * 90);
+      }
+    }
+
+    void putLon(int tag, String key) {
+      final v = first[tag];
+      if (v != null && v.length == 4) {
+        final raw = ByteData.sublistView(v).getInt32(0, Endian.big);
+        out[key] = _round(raw / 2147483647 * 180);
+      }
+    }
+
+    putAngle(5, 'platformHeadingDegrees');
+    putLat(13, 'sensorLatitude');
+    putLon(14, 'sensorLongitude');
+    putLat(23, 'frameCenterLatitude');
+    putLon(24, 'frameCenterLongitude');
+    final version = first[65];
+    if (version != null && version.isNotEmpty) {
+      out['uasDatalinkVersion'] = version.first;
+    }
+    return out;
+  }
+
+  ({int value, int nextOffset})? _readBerLength(Uint8List bytes, int offset) {
+    if (offset >= bytes.length) return null;
+    final first = bytes[offset];
+    if ((first & 0x80) == 0) return (value: first, nextOffset: offset + 1);
+    final count = first & 0x7F;
+    if (count == 0 || count > 4 || offset + 1 + count > bytes.length) {
+      return null;
+    }
+    var value = 0;
+    for (var i = 0; i < count; i++) {
+      value = (value << 8) | bytes[offset + 1 + i];
+    }
+    return (value: value, nextOffset: offset + 1 + count);
+  }
+
+  int _indexOf(Uint8List haystack, List<int> needle, int start) {
+    final last = haystack.length - needle.length;
+    for (var i = start; i <= last; i++) {
+      var matched = true;
+      for (var j = 0; j < needle.length; j++) {
+        if (haystack[i + j] != needle[j]) {
+          matched = false;
+          break;
+        }
+      }
+      if (matched) return i;
+    }
+    return -1;
+  }
+
+  double _round(double value) => (value * 10000000).round() / 10000000;
 }

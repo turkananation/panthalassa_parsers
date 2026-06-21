@@ -24,9 +24,38 @@ class PdfSecurityHandler {
   final String label = '';
 
   static const List<int> _pad = [
-    0x28, 0xBF, 0x4E, 0x5E, 0x4E, 0x75, 0x8A, 0x41, 0x64, 0x00, 0x4E, 0x56,
-    0xFF, 0xFA, 0x01, 0x08, 0x2E, 0x2E, 0x00, 0xB6, 0xD0, 0x68, 0x3E, 0x80,
-    0x2F, 0x0C, 0xA9, 0xFE, 0x64, 0x53, 0x69, 0x7A,
+    0x28,
+    0xBF,
+    0x4E,
+    0x5E,
+    0x4E,
+    0x75,
+    0x8A,
+    0x41,
+    0x64,
+    0x00,
+    0x4E,
+    0x56,
+    0xFF,
+    0xFA,
+    0x01,
+    0x08,
+    0x2E,
+    0x2E,
+    0x00,
+    0xB6,
+    0xD0,
+    0x68,
+    0x3E,
+    0x80,
+    0x2F,
+    0x0C,
+    0xA9,
+    0xFE,
+    0x64,
+    0x53,
+    0x69,
+    0x7A,
   ];
 
   /// Builds a handler from the `/Encrypt` dictionary and the document `/ID`.
@@ -54,7 +83,9 @@ class PdfSecurityHandler {
     if (v >= 4) {
       final cf = res(enc['CF']);
       _Method methodFor(PdfObject? name) {
-        if (name is! PdfName || name.name == 'Identity') return _Method.identity;
+        if (name is! PdfName || name.name == 'Identity') {
+          return _Method.identity;
+        }
         final fd = cf is PdfDict ? res(cf[name.name]) : null;
         final cfm = fd is PdfDict ? res(fd['CFM']) : null;
         if (cfm is PdfName) {
@@ -110,15 +141,19 @@ class PdfSecurityHandler {
     }
     if (obj is PdfDict) {
       return PdfDict({
-        for (final e in obj.entries.entries) e.key: decryptObject(e.value, num, gen),
+        for (final e in obj.entries.entries)
+          e.key: decryptObject(e.value, num, gen),
       });
     }
     if (obj is PdfStream) {
       final dict = PdfDict({
-        for (final e in obj.dict.entries.entries) e.key: decryptObject(e.value, num, gen),
+        for (final e in obj.dict.entries.entries)
+          e.key: decryptObject(e.value, num, gen),
       });
       final type = obj.dict['Type'];
-      if (type is PdfName && type.name == 'XRef') return PdfStream(dict, obj.raw);
+      if (type is PdfName && type.name == 'XRef') {
+        return PdfStream(dict, obj.raw);
+      }
       return PdfStream(dict, _decrypt(obj.raw, num, gen, _stm));
     }
     return obj;
@@ -151,7 +186,13 @@ class PdfSecurityHandler {
   // --- key derivation --------------------------------------------------------
 
   static Uint8List _keyV2(
-      Uint8List o, int p, Uint8List id, int r, int keyLen, bool encMeta) {
+    Uint8List o,
+    int p,
+    Uint8List id,
+    int r,
+    int keyLen,
+    bool encMeta,
+  ) {
     final input = BytesBuilder()
       ..add(Uint8List.fromList(_pad)) // empty password padded == the pad
       ..add(_fixed(o, 32))
@@ -168,14 +209,22 @@ class PdfSecurityHandler {
   }
 
   static bool _validateUserV2(
-      Uint8List key, Uint8List id, Uint8List u, int r, int keyLen) {
+    Uint8List key,
+    Uint8List id,
+    Uint8List u,
+    int r,
+    int keyLen,
+  ) {
     if (r == 2) {
       final uPrime = _rc4Static(key, Uint8List.fromList(_pad));
       return _eq(uPrime, _fixed(u, 32), 32);
     }
     // R3+: Algorithm 5.
     var data = MD5Digest().process(
-      (BytesBuilder()..add(Uint8List.fromList(_pad))..add(id)).toBytes(),
+      (BytesBuilder()
+            ..add(Uint8List.fromList(_pad))
+            ..add(id))
+          .toBytes(),
     );
     data = _rc4Static(key, data);
     for (var i = 1; i <= 19; i++) {
@@ -196,12 +245,22 @@ class PdfSecurityHandler {
         'password-protected PDF: a non-empty user password is required',
       );
     }
-    final intermediate = _hashV5(Uint8List.fromList(pw), keySalt, Uint8List(0), r);
+    final intermediate = _hashV5(
+      Uint8List.fromList(pw),
+      keySalt,
+      Uint8List(0),
+      r,
+    );
     return _aesCbc(intermediate, Uint8List(16), ue, forEncryption: false);
   }
 
   /// SHA-256 (R5) or the iterative Algorithm 2.B (R6) hash.
-  static Uint8List _hashV5(Uint8List pw, Uint8List salt, Uint8List udata, int r) {
+  static Uint8List _hashV5(
+    Uint8List pw,
+    Uint8List salt,
+    Uint8List udata,
+    int r,
+  ) {
     var k = SHA256Digest().process(_concat([pw, salt, udata]));
     if (r < 6) return k;
     var round = 0;
@@ -239,8 +298,11 @@ class PdfSecurityHandler {
   }
 
   static Uint8List _aesCbc(
-      Uint8List key, Uint8List iv, Uint8List data,
-      {required bool forEncryption}) {
+    Uint8List key,
+    Uint8List iv,
+    Uint8List data, {
+    required bool forEncryption,
+  }) {
     final cipher = CBCBlockCipher(AESEngine())
       ..init(forEncryption, ParametersWithIV(KeyParameter(key), iv));
     final aligned = data.length - (data.length % cipher.blockSize);

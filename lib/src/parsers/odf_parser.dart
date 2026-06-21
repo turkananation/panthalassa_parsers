@@ -28,7 +28,10 @@ final class OdfParser implements DocumentParser {
   bool canParse(Uint8List bytes) {
     if (bytes.length < 4) return false;
     // ZIP local file header: 'P' 'K' 0x03 0x04
-    if (bytes[0] != 0x50 || bytes[1] != 0x4B || bytes[2] != 0x03 || bytes[3] != 0x04) {
+    if (bytes[0] != 0x50 ||
+        bytes[1] != 0x4B ||
+        bytes[2] != 0x03 ||
+        bytes[3] != 0x04) {
       return false;
     }
     // The OpenDocument spec mandates an uncompressed `mimetype` member as the
@@ -50,14 +53,20 @@ final class OdfParser implements DocumentParser {
     }
 
     final mimetype = _readEntry(archive, 'mimetype');
-    final mime = mimetype == null ? null : ascii.decode(mimetype, allowInvalid: true).trim();
+    final mime = mimetype == null
+        ? null
+        : ascii.decode(mimetype, allowInvalid: true).trim();
     if (mime == null || !mime.startsWith(_odfMimePrefix)) {
-      throw const MalformedDocumentException('ODF mimetype entry missing or invalid');
+      throw const MalformedDocumentException(
+        'ODF mimetype entry missing or invalid',
+      );
     }
 
     final contentBytes = _readEntry(archive, 'content.xml');
     if (contentBytes == null) {
-      throw const MalformedDocumentException('content.xml not found in ODF container');
+      throw const MalformedDocumentException(
+        'content.xml not found in ODF container',
+      );
     }
 
     final XmlDocument content;
@@ -66,7 +75,9 @@ final class OdfParser implements DocumentParser {
     } on XmlException catch (e) {
       throw MalformedDocumentException('invalid content.xml: ${e.message}');
     } on FormatException catch (e) {
-      throw TextDecodingException('content.xml is not valid UTF-8: ${e.message}');
+      throw TextDecodingException(
+        'content.xml is not valid UTF-8: ${e.message}',
+      );
     }
 
     final paragraphs = <String>[];
@@ -96,9 +107,14 @@ final class OdfParser implements DocumentParser {
     if (metaBytes == null) return const {};
     try {
       final doc = XmlDocument.parse(utf8.decode(metaBytes));
-      final title = doc.findAllElements('title', namespace: '*').firstOrNull?.innerText;
-      final creator =
-          doc.findAllElements('creator', namespace: '*').firstOrNull?.innerText;
+      final title = doc
+          .findAllElements('title', namespace: '*')
+          .firstOrNull
+          ?.innerText;
+      final creator = doc
+          .findAllElements('creator', namespace: '*')
+          .firstOrNull
+          ?.innerText;
       return {
         if (title != null && title.isNotEmpty) 'title': title,
         if (creator != null && creator.isNotEmpty) 'creator': creator,

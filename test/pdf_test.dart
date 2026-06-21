@@ -34,11 +34,16 @@ void main() {
     expect(r.text, contains('County Budget 2026'));
   });
 
-  test('PDF-1: resolves an object-stream PDF via the cross-reference stream', () {
-    final r = registry.parse(buildObjStmPdf(showText: 'Object Streams Resolved'));
-    expect(r.format, DocumentFormat.pdf);
-    expect(r.metadata['pageCount'], 1);
-    expect(r.text, contains('Object Streams Resolved'));
-    expect(r.warnings, isEmpty);
-  });
+  test(
+    'PDF-1: resolves an object-stream PDF via the cross-reference stream',
+    () {
+      final r = registry.parse(
+        buildObjStmPdf(showText: 'Object Streams Resolved'),
+      );
+      expect(r.format, DocumentFormat.pdf);
+      expect(r.metadata['pageCount'], 1);
+      expect(r.text, contains('Object Streams Resolved'));
+      expect(r.warnings, isEmpty);
+    },
+  );
 }

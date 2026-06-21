@@ -47,8 +47,8 @@ final class VerifiableCredentialParser implements DocumentParser {
   @override
   ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
     final whole = JsonSupport.peek(bytes, 1 << 20)?.trim() ?? '';
-    final isJwt = !JsonSupport.looksJson(whole) &&
-        JsonSupport.jwtShape.hasMatch(whole);
+    final isJwt =
+        !JsonSupport.looksJson(whole) && JsonSupport.jwtShape.hasMatch(whole);
     return isJwt
         ? _parseJwt(bytes, whole, hasher)
         : _parseJsonLd(bytes, hasher);
@@ -92,7 +92,9 @@ final class VerifiableCredentialParser implements DocumentParser {
     final header = JsonSupport.decodeJwtSegment(parts[0]);
     final payload = JsonSupport.decodeJwtSegment(parts[1]);
     if (payload == null) {
-      throw const MalformedDocumentException('VC-JWT payload is not valid JSON');
+      throw const MalformedDocumentException(
+        'VC-JWT payload is not valid JSON',
+      );
     }
 
     final text = StringBuffer();

@@ -14,8 +14,14 @@
 library;
 
 export 'src/core/content_hasher.dart' show ContentHasher, PqBytesContentHasher;
+export 'src/core/document_capability.dart';
 export 'src/core/document_format.dart';
 export 'src/core/document_parser.dart' show DocumentParser;
 export 'src/core/parse_exception.dart';
 export 'src/core/parse_result.dart';
 export 'src/core/parser_registry.dart' show ParserRegistry;
+export 'src/render/document_ir.dart';
+export 'src/render/document_renderer.dart';
+export 'src/render/visual_document.dart';
+export 'src/render/visual_primitives.dart';
+export 'src/render/visual_renderer.dart';
