@@ -118,7 +118,7 @@ final class PdfParser implements DocumentParser {
         if (infoString('ModDate') != null) 'modDate': infoString('ModDate'),
         if (doc.encryptionLabel != null) 'encrypted': true,
         if (doc.encryptionLabel != null) 'encryption': doc.encryptionLabel,
-        if (permissions != null) 'permissions': permissions,
+        'permissions': ?permissions,
         if (embedded.files.isNotEmpty)
           'embeddedFileCount': embedded.files.length,
         if (embedded.files.isNotEmpty) 'embeddedFiles': embedded.files,
@@ -191,7 +191,7 @@ final class PdfParser implements DocumentParser {
         }
       }
       files.add({
-        if (name != null) 'name': name,
+        'name': ?name,
         if (data != null) 'size': data.length,
         if (relationship is PdfName) 'relationship': relationship.name,
       });

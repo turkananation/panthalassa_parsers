@@ -40,7 +40,7 @@ final class XmlStructuredParser implements DocumentParser {
       metadata: {
         if (isNiem) 'profile': 'NIEM XML',
         'rootElement': root.localName,
-        if (namespace != null) 'namespace': namespace,
+        'namespace': ?namespace,
         'elementCount': root.descendantElements.length + 1,
       },
       text: _orNull(XmlSupport.extractText(root)),

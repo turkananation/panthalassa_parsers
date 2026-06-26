@@ -80,8 +80,8 @@ final class FhirJsonParser implements DocumentParser {
           'resourceType': resourceTypes.keys.first
         else
           'resourceTypes': resourceTypes,
-        if (firstId != null) 'id': firstId,
-        if (firstProfile != null) 'profile': firstProfile,
+        'id': ?firstId,
+        'profile': ?firstProfile,
         if (entryCount > 0) 'entryCount': entryCount,
         if (ndjson) 'ndjson': true,
         if (ndjson) 'recordCount': records.length,

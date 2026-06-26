@@ -330,8 +330,8 @@ class PdfVisualExtractor {
         'y': rect.y,
         'width': rect.width,
         'height': rect.height,
-        if (fill != null) 'fill': fill,
-        if (stroke != null) 'stroke': stroke,
+        'fill': ?fill,
+        'stroke': ?stroke,
         'strokeWidth': strokeWidth,
       });
     }

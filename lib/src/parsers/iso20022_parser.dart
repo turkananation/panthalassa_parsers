@@ -44,10 +44,10 @@ final class Iso20022Parser implements DocumentParser {
       byteLength: bytes.length,
       metadata: {
         'rootElement': root.localName,
-        if (messageDefinition != null) 'messageDefinition': messageDefinition,
+        'messageDefinition': ?messageDefinition,
         if (messageDefinition != null)
           'messageFamily': messageDefinition.split('.').first,
-        if (businessArea != null) 'businessArea': businessArea,
+        'businessArea': ?businessArea,
       },
       text: _orNull(XmlSupport.extractText(root)),
       warnings: const [],

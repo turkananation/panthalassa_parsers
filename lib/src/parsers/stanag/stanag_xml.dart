@@ -159,16 +159,16 @@ final class Stanag4676TrackingParser implements StanagSubParser {
         ]);
         if (vx != null || vy != null || vz != null) {
           parsed['velocity'] = {
-            if (vx != null) 'x': vx,
-            if (vy != null) 'y': vy,
-            if (vz != null) 'z': vz,
+            'x': ?vx,
+            'y': ?vy,
+            'z': ?vz,
           };
         }
         if (parsed.isNotEmpty) points.add(parsed);
       }
       if (points.isNotEmpty) {
         out.add({
-          if (trackNumber != null) 'trackNumber': trackNumber,
+          'trackNumber': ?trackNumber,
           'points': points,
         });
       }

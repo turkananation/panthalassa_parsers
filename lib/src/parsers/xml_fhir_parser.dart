@@ -83,8 +83,8 @@ final class XmlFhirParser implements DocumentParser {
       byteLength: bytes.length,
       metadata: {
         'resourceType': resourceType,
-        if (id != null) 'id': id,
-        if (profile != null) 'profile': profile,
+        'id': ?id,
+        'profile': ?profile,
         'entryCount': root.findAllElements('entry').length,
       },
       text: _orNull(XmlSupport.extractText(root)),

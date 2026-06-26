@@ -54,7 +54,7 @@ final class CdaParser implements DocumentParser {
           'documentTypeCode': code!.getAttribute('code'),
         if (code?.getAttribute('displayName') != null)
           'documentType': code!.getAttribute('displayName'),
-        if (effectiveTime != null) 'effectiveTime': effectiveTime,
+        'effectiveTime': ?effectiveTime,
         if (templateIds.isNotEmpty) 'templateIds': templateIds,
         'sectionCount': root.findAllElements('section').length,
       },

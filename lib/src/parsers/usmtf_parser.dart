@@ -95,8 +95,8 @@ final class UsmtfParser implements DocumentParser {
       byteLength: bytes.length,
       metadata: {
         'setCount': sets.length,
-        if (messageType != null) 'messageType': messageType,
-        if (messageId != null) 'originator': messageId,
+        'messageType': ?messageType,
+        'originator': ?messageId,
         'setIds': sets.map((s) => s['setId']).toList(),
       },
       text: sets
