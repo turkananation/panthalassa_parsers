@@ -31,6 +31,7 @@ DIR/render engine that can feed Flutter and Jaspr UI adapters.
 | Fuzz/property parser hardening | Complete | Truncated/permuted built-in fixtures never leak raw errors or hang. | `test/parser_hardening_test.dart`; focused hardening test green. |
 | Performance benchmarks | Complete | Add repeatable benchmark entrypoint for large parser classes and isolate parsing. | `benchmark/parse_benchmark.dart`. |
 | Web compile CI | Complete | Add CI job that proves package imports compile to JS without `dart:io`. | `.github/workflows/ci.yml`; local `dart compile js` green. |
+| Standalone workspace CI | Complete | Recreate a one-package Dart workspace before `pub get` so `resolution: workspace` works in the individual repo. | `.github/workflows/ci.yml`. |
 | I18N/stable issue messages | Complete | Keep stable machine-readable issue codes and document UI-side localization path. | `docs/ISSUE_CODES.md`. |
 
 ## Render Engine Track
