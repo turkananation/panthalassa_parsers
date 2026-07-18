@@ -1,6 +1,6 @@
 # Panthalassa Parsers
 
-Pure-Dart, zero-FFI parsers for structured, binary, and composite document
+A Work in Progess - Pure-Dart, zero-FFI parsers for structured, binary, and composite document
 formats. Produces content-addressed, isolate-safe results for the Panthalassa
 Vault. No native dependencies, no `dart:io` — runs on server, Flutter, and web.
 
