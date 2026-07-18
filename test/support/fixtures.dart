@@ -682,7 +682,7 @@ Uint8List buildInlineImagePdf() {
 /// whose `/EF` stream is the invoice XML.
 Uint8List buildPdfA3WithEmbeddedXml({
   String pageText = 'Invoice 2026-001',
-  String seller = 'Esambo Interserve Ltd',
+  String seller = 'Turkana Nation',
 }) {
   final content = ascii.encode('BT /F1 18 Tf 72 720 Td ($pageText) Tj ET');
   final xml = ascii.encode(

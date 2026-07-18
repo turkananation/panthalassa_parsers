@@ -35,7 +35,7 @@ void main() {
         'GS*PO*SENDER*RECEIVER*20260115*1200*1*X*005010~'
         'ST*850*0001~'
         'BEG*00*SA*PO-9981**20260115~'
-        'N1*ST*Esambo Interserve Ltd~'
+        'N1*ST*Turkana Nation~'
         'PO1*1*10*EA*4.99**VP*WIDGET-001~'
         'SE*6*0001~GE*1*1~IEA*1*000000001~';
     final r = reg.parse(u8(isa + rest));
@@ -44,7 +44,7 @@ void main() {
     expect(r.metadata['interchangeControlNumber'], '000000001');
     expect((r.metadata['transactionSets'] as Map)['850'], 1);
     expect((r.metadata['functionalGroups'] as List), contains('PO'));
-    expect(r.text, contains('Esambo Interserve Ltd'));
+    expect(r.text, contains('Turkana Nation'));
     expect(r.text, contains('WIDGET-001'));
   });
 

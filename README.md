@@ -1,4 +1,4 @@
-# panthalassa_parsers
+# Panthalassa Parsers
 
 Pure-Dart, zero-FFI parsers for structured, binary, and composite document
 formats. Produces content-addressed, isolate-safe results for the Panthalassa
@@ -7,7 +7,7 @@ Vault. No native dependencies, no `dart:io` — runs on server, Flutter, and web
 ## Supported formats
 
 | Format | Detection | Output |
-|---|---|---|
+| --- | --- | --- |
 | FHIR/XML | FHIR namespace / known resource root | resourceType, id, profile, text |
 | UN/EDIFACT | `UNA`/`UNB` prefix | interchange header, message types, segments |
 | STEP (ISO 10303-21) | `ISO-10303-21;` token | schema, header, entity-instance index |

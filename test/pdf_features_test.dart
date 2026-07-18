@@ -59,7 +59,7 @@ void _pdfA3Tests() {
       expect(f['relationship'], 'Alternative');
       // Both the page text and the embedded invoice XML are present.
       expect(r.text, contains('Invoice 2026-001'));
-      expect(r.text, contains('Esambo Interserve Ltd'));
+      expect(r.text, contains('Turkana Nation'));
       expect(r.text, contains('1500.00'));
     },
   );

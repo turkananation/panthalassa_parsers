@@ -34,14 +34,14 @@ void main() {
       u8('''<?xml version="1.0"?>
 <Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.09">
   <CstmrCdtTrfInitn><GrpHdr><MsgId>MSG-001</MsgId>
-  <InitgPty><Nm>Esambo Interserve Ltd</Nm></InitgPty></GrpHdr></CstmrCdtTrfInitn>
+  <InitgPty><Nm>Turkana Nation</Nm></InitgPty></GrpHdr></CstmrCdtTrfInitn>
 </Document>'''),
     );
     expect(r.format, DocumentFormat.iso20022);
     expect(r.metadata['messageDefinition'], 'pain.001.001.09');
     expect(r.metadata['messageFamily'], 'pain');
     expect(r.metadata['businessArea'], 'CstmrCdtTrfInitn');
-    expect(r.text, contains('Esambo Interserve Ltd'));
+    expect(r.text, contains('Turkana Nation'));
   });
 
   test('generic XML falls through to the XML engine', () {
