@@ -6,7 +6,7 @@ terms, warranty, indemnity, or to avoid AGPL reciprocity obligations.
 
 If you require a commercial license, please contact Turkana Nation at:
 
-  turkananation@gmail.com
+  <turkananation@gmail.com>
 
 Typical commercial license offerings include:
 
