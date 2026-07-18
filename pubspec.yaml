@@ -14,8 +14,7 @@ resolution: workspace
 dependencies:
   archive: ^4.0.9   # pure-Dart ZIP + inflate (ODF container, PDF FlateDecode); no dart:io
   meta: ^1.16.0
-  pointycastle: ^4.0.0    # pure-Dart MD5/SHA/RC4/AES for the PDF Standard security handler
-  pqforge: ^0.2.2   # PqBytes.sha256 — single hash implementation across the vault
+  pqforge: ^0.3.0   # PqBytes.sha256 — single hash implementation across the vault
   xml: ^6.5.0       # FHIR/XML + ODF content.xml
 
 dev_dependencies:
