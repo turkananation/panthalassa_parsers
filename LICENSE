@@ -1,67 +1,21 @@
-# Copyright (c) 2026 Turkana Nation
+MIT License
 
-## Dual licensing: GNU AGPL v3.0 OR Commercial License
+Copyright (c) 2026 Turkana Nation
 
-This project is dual-licensed. You may choose either of the following
-options when using, modifying, or redistributing this software:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-1) GNU AFFERO GENERAL PUBLIC LICENSE Version 3 (AGPLv3)
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
- The source code is licensed under the GNU Affero General Public
- License version 3.0. Under the AGPLv3 you must make source code
- (including modifications and any network-deployed program source)
- available under the same license. See the full text of the AGPLv3
- below.
-
-1) Commercial License
-
- If you do not wish to comply with the terms of the AGPLv3, a
- commercial license is available from Turkana Nation.
- Contact: <turkananation@gmail.com> to discuss commercial licensing
- terms and support options.
-
----- BEGIN AGPLv3 LICENSE TEXT ----
-
-        GNU AFFERO GENERAL PUBLIC LICENSE
-         Version 3, 19 November 2007
-
- Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
- Everyone is permitted to copy and distribute verbatim copies
- of this license document, but changing it is not allowed.
-
- Preamble
-
-  The GNU Affero General Public License is a free, copyleft license for
-  software and other kinds of works, specifically designed to ensure
-  cooperation with the community in the case of network server software.
-
-  The licenses for most software and other practical works are designed
-  to take away your freedom to share and change the works.  By contrast,
-  our General Public Licenses are intended to guarantee your freedom to
-  share and change all versions of a program--to make sure it remains free
-  software for all its users.
-
-  When a program is run on a user's own computer, the user has access to
-  the source code.  But when a program is run on a server and users
-  interact with it remotely through a network, the server operator
-  controls the version of the program that is run, and users don't have
-  access to the source code.  The GNU Affero General Public License is
-  intended to ensure that users who interact with a network service
-  offered by a program that is licensed under this License have access to
-  the source code of the program running that service.
-
-  ...
-
-  (Full license text omitted here for brevity. The complete GNU Affero
-  General Public License v3.0 is available from the Free Software
-  Foundation: <https://www.gnu.org/licenses/agpl-3.0.txt>)
-
----- END AGPLv3 LICENSE TEXT ----
-
-Notes:
-
-- Replace the placeholder licensing contact email above with the
-  appropriate commercial-licensing contact for Turkana Nation.
-- If you want the complete AGPLv3 license verbatim in this file,
-  replace the "..." and the omitted section with the full text from
-  <https://www.gnu.org/licenses/agpl-3.0.txt>
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
