@@ -1,0 +1,8 @@
+doc/
+test/
+tool/
+.github
+.dart_tool/
+benchmark/
+CLAUDE.md
+AGENTS.md

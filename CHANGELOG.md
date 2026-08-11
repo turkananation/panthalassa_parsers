@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0-dev
+## 0.5.0
 
 - STANAG depth: 4607 Dwell/target body fields, 4609 MISB ST 0601 local-set TLVs,
   4676 per-track-point kinematics, new 7023 NPIF parser, and conservative 5516
@@ -34,7 +34,6 @@ Closes the Panthalassa formats matrix — every advertised standard now has a pa
   still yield text + a content id rather than being rejected.
 - New `DocumentFormat` values: fhirJson, hl7v2, cda, verifiableCredential, niem,
   iso20022, x12, json, xml.
-
 
 ## 0.3.0
 

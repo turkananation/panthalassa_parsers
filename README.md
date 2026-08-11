@@ -2,7 +2,8 @@
 
 A Work in Progess - Pure-Dart, zero-FFI parsers for structured, binary, and composite document
 formats. Produces content-addressed, isolate-safe results for the Panthalassa
-Vault. No native dependencies, no `dart:io` — runs on server, Flutter, and web.
+Vault or other projects that require parsers for the supported files. 
+No native dependencies, no `dart:io` — runs on server, Flutter, and web.
 
 ## Supported formats
 
@@ -28,11 +29,11 @@ NITF parser.
 ## Quickstart
 
 ```dart
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:panthalassa_parsers/panthalassa_parsers.dart';
 
 Future<void> main(List<String> args) async {
-  final bytes = await File(args.first).readAsBytes();
+  final bytes = await loadBytes(args.first);
   final registry = ParserRegistry.standard();
 
   final format = registry.detect(bytes);          // cheap detection
@@ -41,16 +42,13 @@ Future<void> main(List<String> args) async {
   print('${result.format.label}  id=${result.documentId}');
   print(result.metadata);
   if (result.hasText) print(result.text);
-
-  final doc = DocumentIr.fromParseResult(result);
-  final html = const HtmlDocumentRenderer().render(doc);
-  print(html); // escaped semantic HTML for web/Jaspr-style adapters
-
-  final visual = doc.toVisualDocument();
-  final svg = const SvgVisualRenderer().render(visual);
-  print(svg); // faithful display-list preview where visual pages exist
 }
 ```
+
+Implement `loadBytes(...)` with the appropriate platform API in your app
+(`File.readAsBytes` on server, `rootBundle.load` on Flutter, `fetch`/XHR on web).
+Do not import `dart:io` from the `lib/` package — production `lib/` code is
+pure-Dart and must remain web-safe.
 
 Synchronous `registry.parse(bytes)` is available for small inputs. Inject a
 custom `ContentHasher` (e.g. backed by the vault's `PqBytes.sha256`) via
