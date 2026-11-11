@@ -36,7 +36,7 @@ DIR/render engine that feeds Flutter and Jaspr UI adapters.
 | ODF/OOXML/EPUB depth | Complete | Text/structure, sheets/slides, tables, media, metadata, and safety warnings without layout fidelity. | `test/odf_test.dart`; `test/ooxml_test.dart`; `test/new_formats_test.dart`. |
 | EML/HTML/Image/Markdown/CSV | Complete | New format families with hint-gated Markdown/CSV and safety warnings for scripts/external refs. | `test/eml_test.dart`; `test/html_test.dart`; `test/new_formats_test.dart`. |
 | Triple content digest | Complete | SHA-256/384/512 via `PqBytes`; `documentId` remains SHA-256; `ParseResult` carries `ContentDigest`. | `test/framework_test.dart`; `lib/src/core/content_hasher.dart`. |
-| ParseResult schema/parser versioning | Complete | `parseResultSchemaVersion` (2) and `parserVersion` (0.5.1) stamped on results. | `lib/src/core/parse_result.dart`; `test/framework_test.dart`. |
+| ParseResult schema/parser versioning | Complete | `parseResultSchemaVersion` (2) and `parserVersion` (0.5.2) stamped on results. | `lib/src/core/parse_result.dart`; `test/framework_test.dart`. |
 | Structured artifacts + options | Complete | Tables, outline, structured text, attachments, signatures, security labels, `ParseOptions`/`ParseLimits`. | `test/render_engine_test.dart`; `test/parser_hardening_test.dart`. |
 | Isolate/web/batch runners | Complete | Background isolate parsing, web fallback, bounded batch concurrency. | `test/framework_test.dart`; `lib/src/core/parser_registry.dart`. |
 | Fuzz/property parser hardening | Complete | Truncated/permuted built-in fixtures never leak raw errors or hang. | `test/parser_hardening_test.dart`. |
@@ -60,6 +60,7 @@ DIR/render engine that feeds Flutter and Jaspr UI adapters.
 | PDF visual page extraction | Complete initial | Surface page boxes and conservative text/rect/image-placeholder display-list commands without claiming full rasterization. | `lib/src/parsers/pdf/pdf_visual.dart`; `test/render_engine_test.dart`. |
 | SVG visual renderer | Complete initial | Framework-free faithful preview/export output for display-list pages. | `lib/src/render/visual_renderer.dart`; `test/render_engine_test.dart`; CLI `render --format svg`. |
 | NITF/DICOM visual placeholders | Complete initial | Project known image/frame dimensions into visual pages until pixel codecs land. | `test/render_engine_test.dart`. |
+| Expanded viewer suite | Complete | Dedicated builders for XLSX/ODS, raster image, EML, PDF embed, and structured JSON/XML/NIEM; DICOM SR/no-pixel text; shared `viewerTableSection`. | `lib/src/view/*`; `test/viewer_test.dart`; CLI `view`. |
 | DICOM viewer pixel path | Complete initial | Decode supported syntaxes to windowed PNG for self-contained HTML; unsupported codecs degrade to metadata-only notices. | `lib/src/parsers/dicom/dicom_image.dart`; `test/dicom_image_test.dart`; `test/viewer_test.dart`; CLI `view`. |
 | Flutter adapter | Not started | Separate adapter package/app layer; sliver/lazy `DocumentView`, accessibility, search. | Flutter tests/screenshots. |
 | Jaspr adapter | Not started | HTML/component adapter that consumes pure-Dart DIR/render tree without duplicating parser logic. | Jaspr smoke test. |

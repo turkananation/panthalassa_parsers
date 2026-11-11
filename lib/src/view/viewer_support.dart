@@ -1,6 +1,9 @@
 /// Small shared formatting helpers for viewer builders.
 library;
 
+import '../core/structured_artifacts.dart';
+import 'viewer_document.dart';
+
 /// Human byte count with binary units.
 String formatViewerBytes(int bytes) {
   if (bytes < 1024) return '$bytes B';
@@ -59,4 +62,67 @@ String viewerValue(Object? value) {
         .join('; ');
   }
   return '';
+}
+
+int? viewerInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+/// Converts a parser table into the viewer's bounded, filterable grid.
+ViewerTableSection viewerTableSection(
+  DocumentTable table,
+  ViewerOptions options, {
+  String? fallbackTitle,
+}) {
+  final allRows = table.rows;
+  final header = allRows.isNotEmpty ? allRows.first : const <String>[];
+  final data = allRows.length > 1 ? allRows.sublist(1) : const <List<String>>[];
+  var columnCount = header.length;
+  for (final row in data) {
+    if (row.length > columnCount) columnCount = row.length;
+  }
+  final columns = [
+    for (var i = 0; i < columnCount; i++)
+      _columnName(i < header.length ? header[i] : '', i),
+  ];
+  final limit = options.allRows || options.rowLimit <= 0
+      ? null
+      : options.rowLimit;
+  final shown = limit == null || limit >= data.length ? data.length : limit;
+  final name = table.name?.trim() ?? '';
+  return ViewerTableSection(
+    title: name.isEmpty ? fallbackTitle : name,
+    columns: columns,
+    rows: [
+      for (final row in data.take(shown))
+        [for (var i = 0; i < columnCount; i++) i < row.length ? row[i] : ''],
+    ],
+    caption: table.caption,
+    totalRowCount: data.length,
+    truncated: shown < data.length,
+    filterable: true,
+  );
+}
+
+/// Metadata rows suitable for a side table; visual page payloads are skipped.
+List<List<String>> viewerMetadataRows(
+  Map<String, Object?> metadata, {
+  int maxRows = 200,
+}) {
+  final rows = <List<String>>[];
+  for (final entry in metadata.entries) {
+    if (entry.key == 'visualPages' || rows.length >= maxRows) continue;
+    final value = viewerValue(entry.value);
+    if (value.isEmpty) continue;
+    rows.add([entry.key, value]);
+  }
+  return rows;
+}
+
+String _columnName(String value, int index) {
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? 'Column ${index + 1}' : trimmed;
 }

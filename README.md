@@ -102,7 +102,7 @@ dart run bin/panthalassa.dart --help
 | `detect <file>` | Format, confidence, and evidence. `--filename` / `--mime` disambiguate. |
 | `parse <file>` | Full parse with a human summary, `--json`, `--text`, or `--metadata`. |
 | `render <file>` | Text, Markdown, escaped HTML, or SVG (`--format`). |
-| `view <file>` | Self-contained HTML viewer; filterable CSV/TSV tables and windowed DICOM images. Opens the browser by default. |
+| `view <file>` | Self-contained HTML viewer; filterable CSV/TSV tables, spreadsheet sheets, image previews, email, PDF embedding, DICOM images, and structured source. Opens the browser by default. |
 | `batch <path>...` | Files/directories with bounded isolate concurrency, `--recursive`, `--include`, `--out-dir`, `--json`, and `--fail-fast`. |
 | `digest <file>...` | SHA-256/384/512 content addresses, `--algo`, `--short`, and `--expect` verification. |
 | `formats [query]` | Supported formats, capabilities, detection hints, and parser families. |
@@ -132,6 +132,11 @@ panthalassa render report.pdf --format svg --out report.svg
 
 # Self-contained HTML viewer (browser opens unless --no-open)
 panthalassa view measurements.csv
+panthalassa view workbook.xlsx
+panthalassa view scan.jpg
+panthalassa view message.eml
+panthalassa view report.pdf
+panthalassa view payload.json
 panthalassa view scan.dcm --frame 3 --window-center 40 --window-width 400
 panthalassa view scan.dcm --no-open --out scan.view.html --print-path
 ```

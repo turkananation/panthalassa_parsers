@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -381,6 +382,193 @@ Uint8List buildDicomWithSequenceAndMultiValues() {
 
   return b.toBytes();
 }
+
+/// Builds a minimal explicit-VR LE DICOM Structured Report with a single TEXT
+/// content item and no Pixel Data.
+Uint8List buildDicomStructuredReport({String finding = 'No acute finding'}) {
+  List<int> tag(int group, int element) => [..._le16(group), ..._le16(element)];
+
+  List<int> item(List<int> content) => [
+    ...tag(0xFFFE, 0xE000),
+    ..._le32(content.length),
+    ...content,
+  ];
+
+  List<int> sequence(int group, int element, List<List<int>> items) {
+    final content = [for (final itemContent in items) ...item(itemContent)];
+    return [
+      ...tag(group, element),
+      ...ascii.encode('SQ'),
+      0,
+      0,
+      ..._le32(content.length),
+      ...content,
+    ];
+  }
+
+  List<int> element(int group, int element, String vr, List<int> value) =>
+      _dicomSyntaxElement(
+        group,
+        element,
+        vr,
+        value,
+        implicit: false,
+        endian: Endian.little,
+      );
+
+  final conceptName = sequence(0x0040, 0xA043, [
+    [
+      ...element(0x0008, 0x0100, 'SH', _dicomString('121071')),
+      ...element(0x0008, 0x0102, 'SH', _dicomString('DCM')),
+      ...element(0x0008, 0x0104, 'LO', _dicomString('Finding')),
+    ],
+  ]);
+  final contentItem = [
+    ...element(0x0040, 0xA010, 'CS', _dicomString('CONTAINS')),
+    ...element(0x0040, 0xA040, 'CS', _dicomString('TEXT')),
+    ...conceptName,
+    ...element(0x0040, 0xA160, 'UT', _dicomString(finding)),
+  ];
+  final dataset = [
+    ...element(0x0008, 0x0060, 'CS', _dicomString('SR')),
+    ...sequence(0x0040, 0xA730, [contentItem]),
+  ];
+  return _dicomPart10(transferSyntax: '1.2.840.10008.1.2.1', dataset: dataset);
+}
+
+/// Builds a valid 4×3 PNG for viewer preview tests.
+Uint8List buildViewerPng({int width = 4, int height = 3}) {
+  final image = img.Image(width: width, height: height);
+  img.fill(image, color: img.ColorRgb8(0, 128, 255));
+  return img.encodePng(image);
+}
+
+/// Builds a minimal two-sheet XLSX workbook with header rows.
+Uint8List buildSpreadsheetXlsx() {
+  final archive = Archive();
+  const contentTypes =
+      '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>''';
+  const rootRels = '''<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>''';
+  const workbookRels = '''<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+</Relationships>''';
+  const workbookXml = '''<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Budget" sheetId="1" r:id="rId1"/>
+    <sheet name="Notes" sheetId="2" r:id="rId2"/>
+  </sheets>
+</workbook>''';
+  const sheet1Xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1">
+      <c r="A1" t="str"><v>Item</v></c>
+      <c r="B1" t="str"><v>Amount</v></c>
+    </row>
+    <row r="2">
+      <c r="A2" t="str"><v>Alpha</v></c>
+      <c r="B2"><v>42</v></c>
+    </row>
+  </sheetData>
+</worksheet>''';
+  const sheet2Xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1">
+      <c r="A1" t="str"><v>Note</v></c>
+    </row>
+    <row r="2">
+      <c r="A2" t="str"><v>Hello</v></c>
+    </row>
+  </sheetData>
+</worksheet>''';
+
+  archive.addFile(ArchiveFile.string('[Content_Types].xml', contentTypes));
+  archive.addFile(ArchiveFile.string('_rels/.rels', rootRels));
+  archive.addFile(ArchiveFile.string('xl/workbook.xml', workbookXml));
+  archive.addFile(
+    ArchiveFile.string('xl/_rels/workbook.xml.rels', workbookRels),
+  );
+  archive.addFile(ArchiveFile.string('xl/worksheets/sheet1.xml', sheet1Xml));
+  archive.addFile(ArchiveFile.string('xl/worksheets/sheet2.xml', sheet2Xml));
+  return Uint8List.fromList(ZipEncoder().encodeBytes(archive) as List<int>);
+}
+
+/// Builds a minimal one-sheet ODS spreadsheet.
+Uint8List buildSpreadsheetOds() {
+  final archive = Archive();
+  final mime = ascii.encode('application/vnd.oasis.opendocument.spreadsheet');
+  archive.addFile(ArchiveFile.noCompress('mimetype', mime.length, mime));
+
+  final content = utf8.encode(
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<office:document-content '
+    'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+    'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
+    'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">'
+    '<office:body><office:spreadsheet>'
+    '<table:table table:name="Budget">'
+    '<table:table-row>'
+    '<table:table-cell><text:p>Item</text:p></table:table-cell>'
+    '<table:table-cell><text:p>Amount</text:p></table:table-cell>'
+    '</table:table-row>'
+    '<table:table-row>'
+    '<table:table-cell><text:p>Alpha</text:p></table:table-cell>'
+    '<table:table-cell><text:p>42</text:p></table:table-cell>'
+    '</table:table-row>'
+    '</table:table>'
+    '</office:spreadsheet></office:body>'
+    '</office:document-content>',
+  );
+  archive.addFile(ArchiveFile('content.xml', content.length, content));
+  return Uint8List.fromList(ZipEncoder().encode(archive));
+}
+
+/// Builds an RFC 822 message with a plain-text body and a base64 attachment.
+Uint8List buildEmlWithAttachment({
+  String subject = 'Viewer message',
+  String body = 'Hello from the viewer.',
+}) => Uint8List.fromList(
+  utf8.encode(
+    'From: sender@example.com\n'
+    'To: recipient@example.com\n'
+    'Subject: $subject\n'
+    'Date: Wed, 11 Nov 2026 10:00:00 +0000\n'
+    'Message-ID: <viewer@example.com>\n'
+    'MIME-Version: 1.0\n'
+    'Content-Type: multipart/mixed; boundary="viewer-boundary"\n'
+    '\n'
+    '--viewer-boundary\n'
+    'Content-Type: text/plain; charset=utf-8\n'
+    '\n'
+    '$body\n'
+    '--viewer-boundary\n'
+    'Content-Type: application/pdf; name="report.pdf"\n'
+    'Content-Disposition: attachment; filename="report.pdf"\n'
+    'Content-Transfer-Encoding: base64\n'
+    '\n'
+    'JVBERi0xLjQK\n'
+    '--viewer-boundary--\n',
+  ),
+);
+
+/// Reads a real externally generated encrypted PDF fixture.
+Uint8List buildEncryptedPdf({String name = 'enc_rc4_40.pdf'}) =>
+    File('test/fixtures/$name').readAsBytesSync();
 
 /// Builds a minimal NITF 2.1 file with image, graphic, text, DES, and RES
 /// segments so segment-table and body walking can be tested without assets.

@@ -3,7 +3,7 @@ description: >-
   Pure-Dart, zero-FFI document parsers for healthcare, EDI, binary, PDF, office,
   EPUB, email, HTML, Markdown, CSV and common image documents, with
   SHA-256/384/512 content addressing.
-version: 0.5.1
+version: 0.5.2
 homepage: https://github.com/turkananation/panthalassa_parsers
 repository: https://github.com/turkananation/panthalassa_parsers
 

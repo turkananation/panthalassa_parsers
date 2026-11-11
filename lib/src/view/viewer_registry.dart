@@ -2,6 +2,11 @@ import '../core/parse_result.dart';
 import 'csv_view_builder.dart';
 import 'dicom_view_builder.dart';
 import 'document_view_builder.dart';
+import 'email_view_builder.dart';
+import 'image_view_builder.dart';
+import 'pdf_view_builder.dart';
+import 'spreadsheet_view_builder.dart';
+import 'structured_source_view_builder.dart';
 import 'viewer_document.dart';
 
 /// Selects the first matching [ViewBuilder], falling back to a semantic HTML
@@ -12,7 +17,15 @@ final class ViewerRegistry {
 
   /// Registry used by `panthalassa view`.
   factory ViewerRegistry.standard() => ViewerRegistry(
-    builders: const [CsvViewBuilder(), DicomViewBuilder()],
+    builders: const [
+      CsvViewBuilder(),
+      SpreadsheetViewBuilder(),
+      ImageViewBuilder(),
+      EmailViewBuilder(),
+      PdfViewBuilder(),
+      DicomViewBuilder(),
+      StructuredSourceViewBuilder(),
+    ],
     fallback: const DocumentViewBuilder(),
   );
 

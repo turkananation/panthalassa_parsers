@@ -60,12 +60,15 @@ final class ViewerHtmlRenderer {
       out.writeln(_notice(notice));
     }
     var tableIndex = 0;
+    var embedIndex = 0;
     for (final section in document.sections) {
       switch (section) {
         case ViewerTableSection():
           _writeTable(out, section, tableIndex++);
         case ViewerImageSection():
           _writeImage(out, document, section);
+        case ViewerEmbedSection():
+          _writeEmbed(out, document, section, embedIndex++);
         case ViewerTextSection():
           _writeText(out, section);
         case ViewerHtmlSection():
@@ -215,6 +218,57 @@ final class ViewerHtmlRenderer {
     }
     out
       ..writeln('</figure>')
+      ..writeln('</section>');
+  }
+
+  void _writeEmbed(
+    StringBuffer out,
+    ViewerDocument document,
+    ViewerEmbedSection section,
+    int index,
+  ) {
+    final asset = document.assets[section.assetName];
+    final id = 'viewer-embed-$index';
+    final downloadName = section.downloadName ?? section.assetName;
+    out
+      ..writeln('<section class="panel embed-panel">')
+      ..writeln('<div class="panel-head">');
+    if (section.title != null && section.title!.isNotEmpty) {
+      out.writeln('<h2>${_escape(section.title!)}</h2>');
+    }
+    out
+      ..writeln(
+        '<a class="button" id="$id-link" download="${_escape(downloadName)}">'
+        'Download original</a>',
+      )
+      ..writeln('</div>');
+    if (asset == null) {
+      out
+        ..writeln('<p class="empty">Embedded document is missing.</p>')
+        ..writeln('</section>');
+      return;
+    }
+    out
+      ..writeln(
+        '<div id="$id-data" class="embed-data" '
+        'data-mime="${_escape(asset.mimeType)}" hidden>'
+        '${base64Encode(asset.bytes)}</div>',
+      )
+      ..writeln(
+        '<embed id="$id" class="embed-frame" '
+        'type="${_escape(asset.mimeType)}" '
+        'title="${_escape(section.title ?? asset.name)}">',
+      );
+    if (section.caption != null && section.caption!.isNotEmpty) {
+      out.writeln(
+        '<p class="section-caption">${_escape(section.caption!)}</p>',
+      );
+    }
+    out
+      ..writeln(
+        '<p class="hint">If the embedded preview does not render, use the '
+        'download link above.</p>',
+      )
       ..writeln('</section>');
   }
 
@@ -459,6 +513,28 @@ tbody tr[hidden] { display: none; }
   color: var(--muted);
   font-size: 12px;
 }
+.button {
+  margin-left: auto;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--accent);
+  border-radius: 7px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.button:hover { background: var(--accent-soft); }
+.embed-frame {
+  display: block;
+  width: 100%;
+  height: 78vh;
+  min-height: 420px;
+  border: 0;
+  background: var(--panel-2);
+}
+.embed-panel .hint a { color: var(--accent); }
 .text-block {
   margin: 0;
   padding: 16px;
@@ -556,6 +632,26 @@ tbody tr[hidden] { display: none; }
 
 const String _script = r'''
 (function () {
+  document.querySelectorAll('.embed-data').forEach(function (data) {
+    var mime = data.getAttribute('data-mime') || 'application/octet-stream';
+    var binary;
+    try {
+      binary = atob(data.textContent.trim());
+    } catch (error) {
+      return;
+    }
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    var url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    var id = data.id.replace(/-data$/, '');
+    var frame = document.getElementById(id);
+    if (frame) frame.src = url;
+    var link = document.getElementById(id + '-link');
+    if (link) link.href = url;
+  });
+
   document.querySelectorAll('table[data-filterable="true"]').forEach(function (table) {
     var input = document.querySelector('input[data-filter="' + table.id + '"]');
     if (!input) return;

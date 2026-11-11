@@ -107,8 +107,8 @@ final class ViewCommand extends Command<void> {
 
   @override
   String get description =>
-      'Open a fast document viewer for CSV/TSV tables, DICOM images, or any '
-      'supported format.';
+      'Open a fast document viewer for tables, spreadsheets, images, email, '
+      'PDF, DICOM, structured JSON/XML, or any supported format.';
 
   @override
   String get invocation => 'panthalassa view <file|-> [options]';
@@ -117,10 +117,14 @@ final class ViewCommand extends Command<void> {
   String get usageFooter => usageExamples([
     '# Open a CSV in the default browser with a filterable table',
     'panthalassa view report.csv',
+    '# Preview a spreadsheet, image, email, PDF, or structured payload',
+    'panthalassa view workbook.xlsx',
+    'panthalassa view scan.jpg',
+    'panthalassa view message.eml',
+    'panthalassa view report.pdf',
+    'panthalassa view payload.json',
     '# Render a DICOM image with a custom window, without opening a browser',
     'panthalassa view scan.dcm --window-center 40 --window-width 400 --no-open',
-    '# Write a self-contained viewer next to the source document',
-    'panthalassa view report.xlsx --out report.view.html',
     '# Print the cached viewer path for an editor integration',
     'panthalassa view scan.dcm --print-path',
     '# Pipe the generated HTML to another tool',
@@ -261,7 +265,7 @@ final class ViewCommand extends Command<void> {
       console.detail('tables', '${result.tables.length}');
     }
     if (viewer.assets.isNotEmpty) {
-      console.detail('images', '${viewer.assets.length}');
+      console.detail('assets', '${viewer.assets.length}');
     }
     console.detail('documentId', result.documentId);
     console.detail(

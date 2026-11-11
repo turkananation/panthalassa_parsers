@@ -123,10 +123,15 @@ lib/
     viewer_document.dart           # ViewerDocument model + ViewBuilder SPI
     viewer_registry.dart           # viewer-builder selection
     viewer_html.dart               # self-contained HTML/CSS/JS shell
-    csv_view_builder.dart          # filterable CSV/TSV table view
-    dicom_view_builder.dart        # DICOM image frames, windowing, notices
-    document_view_builder.dart     # semantic-HTML fallback
     viewer_support.dart            # basename + shared viewer helpers
+    csv_view_builder.dart          # filterable CSV/TSV table view
+    dicom_view_builder.dart        # DICOM image frames, SR/no-pixel text, notices
+    document_view_builder.dart     # semantic-HTML fallback
+    spreadsheet_view_builder.dart  # XLSX/ODS sheet sections
+    image_view_builder.dart        # raster/SVG preview + metadata table
+    email_view_builder.dart        # EML headers, body, attachments
+    pdf_view_builder.dart          # PDF embed + extracted text fallback
+    structured_source_view_builder.dart  # pretty JSON/XML/NIEM source
 test/
   framework_test.dart  structured_formats_test.dart  binary_formats_test.dart
   pdf_test.dart  odf_test.dart  ooxml_test.dart  eml_test.dart  html_test.dart
@@ -145,7 +150,7 @@ console. Commands:
 | `detect` | `detectDetailed`; `--filename`/`--mime`; `--require-match` exits 65 when unknown. |
 | `parse` | Human summary, `--json` (`ParseResult` schema), `--text`, `--metadata`; shared `ParseOptions`/`ParseLimits` flags. |
 | `render` | `text`, `markdown`, `html`, or `svg` through `DocumentIr`/`SvgVisualRenderer`. |
-| `view` | Parse, select a `ViewBuilder`, write self-contained HTML, and open a browser. `--out`, `--no-open`, `--print-path`, `--raw`, `--json`, `--sync`, `--quiet`, `--title`, `--limit`/`--all-rows`, and DICOM `--frame`/`--all-frames`/`--window-center`/`--window-width`/`--invert`. |
+| `view` | Parse, select a `ViewBuilder`, write self-contained HTML, and open a browser. CSV/TSV, XLSX/ODS, image, EML, PDF, DICOM, and structured JSON/XML/NIEM builders. `--out`, `--no-open`, `--print-path`, `--raw`, `--json`, `--sync`, `--quiet`, `--title`, `--limit`/`--all-rows`, and DICOM `--frame`/`--all-frames`/`--window-center`/`--window-width`/`--invert`. |
 | `batch` | `expandBatchInputs` + `mapPool`; bounded isolate concurrency; `--out-dir`, `--json`, `--fail-fast`. |
 | `digest` | `PqBytesContentHasher`; all three digests by default; `--expect` compares SHA-256. |
 | `formats` | Formats grouped by category, capabilities, hint requirements, parser classes. |

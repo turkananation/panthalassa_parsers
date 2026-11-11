@@ -57,13 +57,16 @@ final class DicomViewBuilder implements ViewBuilder {
     }
 
     if (image == null) {
+      _appendStructuredSections(result, options, sections);
+      final hasContent = sections.isNotEmpty;
       notices.add(
         ViewerNotice(
           result.metadata['hasPixelData'] == true
               ? 'This DICOM instance declares Pixel Data, but no decodable '
-                    'payload was available. Showing metadata only.'
+                    'payload was available. Showing '
+                    '${hasContent ? 'extracted content and metadata' : 'metadata only'}.'
               : 'This DICOM instance has no Pixel Data element. Showing '
-                    'metadata only.',
+                    '${hasContent ? 'extracted content and metadata' : 'metadata only'}.',
           level: ViewerNoticeLevel.warning,
         ),
       );
@@ -134,6 +137,8 @@ final class DicomViewBuilder implements ViewBuilder {
       }
     }
 
+    _appendStructuredSections(result, options, sections);
+
     if (sections.isEmpty) {
       notices.add(
         const ViewerNotice(
@@ -154,6 +159,26 @@ final class DicomViewBuilder implements ViewBuilder {
       notices: notices,
       footer: 'Panthalassa DICOM viewer',
     );
+  }
+
+  void _appendStructuredSections(
+    ParseResult result,
+    ViewerOptions options,
+    List<ViewerSection> sections,
+  ) {
+    final text = result.text?.trim();
+    if (text != null && text.isNotEmpty) {
+      sections.add(ViewerTextSection(title: 'Report text', text: text));
+    }
+    for (var i = 0; i < result.tables.length; i++) {
+      sections.add(
+        viewerTableSection(
+          result.tables[i],
+          options,
+          fallbackTitle: 'Table ${i + 1}',
+        ),
+      );
+    }
   }
 
   List<int> _framesToRender(

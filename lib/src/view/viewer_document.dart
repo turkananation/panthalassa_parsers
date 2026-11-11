@@ -85,6 +85,20 @@ final class ViewerImageSection extends ViewerSection {
   final bool zoomable;
 }
 
+/// An embedded document rendered by a browser-native viewer, such as PDF.
+final class ViewerEmbedSection extends ViewerSection {
+  const ViewerEmbedSection({
+    super.title,
+    required this.assetName,
+    this.downloadName,
+    this.caption,
+  });
+
+  final String assetName;
+  final String? downloadName;
+  final String? caption;
+}
+
 /// Preformatted text, useful for text-only extracts and diagnostics.
 final class ViewerTextSection extends ViewerSection {
   const ViewerTextSection({

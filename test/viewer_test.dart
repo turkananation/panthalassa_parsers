@@ -38,7 +38,7 @@ void main() {
       final standard = ViewerRegistry.standard();
       expect(standard.builderFor(csv).id, 'csv');
       expect(standard.builderFor(dicom).id, 'dicom');
-      expect(standard.builderFor(pdf).id, 'document');
+      expect(standard.builderFor(pdf).id, 'pdf');
     });
   });
 
@@ -211,6 +211,274 @@ void main() {
         contains('not supported for pixel rendering'),
       );
       expect(viewer.facts['Transfer syntax'], isNotEmpty);
+    });
+  });
+
+  group('SpreadsheetViewBuilder', () {
+    test('renders XLSX sheets as sections with row totals', () {
+      final result = registry.parse(
+        buildSpreadsheetXlsx(),
+        options: const ParseOptions(includeTables: true),
+      );
+      expect(result.format, DocumentFormat.xlsx);
+      final viewer = const SpreadsheetViewBuilder().build(
+        request(result, bytes: buildSpreadsheetXlsx(), filename: 'budget.xlsx'),
+      );
+
+      expect(viewer.title, 'budget.xlsx');
+      expect(viewer.formatLabel, 'SpreadsheetML (XLSX)');
+      expect(viewer.facts['Sheets'], '2');
+      expect(viewer.facts['Rows'], '2');
+      final titles = viewer.sections
+          .whereType<ViewerTableSection>()
+          .map((s) => s.title)
+          .toList();
+      expect(titles, contains('Budget'));
+      expect(titles, contains('Notes'));
+      expect(viewer.subtitle, contains('2 sheets'));
+    });
+
+    test('renders ODS spreadsheets as sections', () {
+      final result = registry.parse(
+        buildSpreadsheetOds(),
+        options: const ParseOptions(includeTables: true),
+      );
+      expect(result.format, DocumentFormat.odf);
+      expect(result.metadata['documentClass'], 'spreadsheet');
+      final viewer = const SpreadsheetViewBuilder().build(
+        request(result, bytes: buildSpreadsheetOds(), filename: 'budget.ods'),
+      );
+      expect(viewer.formatLabel, 'ODS spreadsheet');
+      expect(viewer.sections, hasLength(1));
+      final table = viewer.sections.single as ViewerTableSection;
+      expect(table.title, 'Budget');
+      expect(table.columns, ['Item', 'Amount']);
+      expect(table.rows, [
+        ['Alpha', '42'],
+      ]);
+    });
+
+    test('does not claim unsupported formats', () {
+      final csv = parseCsv('name,value\nalpha,1');
+      expect(const SpreadsheetViewBuilder().supports(csv), isFalse);
+    });
+  });
+
+  group('ImageViewBuilder', () {
+    test('embeds PNG preview with metadata table', () {
+      final bytes = buildViewerPng(width: 4, height: 3);
+      final result = registry.parse(bytes);
+      expect(result.format, DocumentFormat.image);
+      expect(result.metadata['mediaType'], 'image/png');
+      expect(result.metadata['width'], 4);
+      expect(result.metadata['height'], 3);
+      final viewer = const ImageViewBuilder().build(
+        request(result, bytes: bytes, filename: 'chart.png'),
+      );
+      expect(viewer.formatLabel, 'PNG');
+      expect(viewer.facts['Dimensions'], '4 × 3 px');
+      expect(viewer.assets.keys, contains('image.png'));
+      final images = viewer.sections.whereType<ViewerImageSection>();
+      expect(images, hasLength(1));
+      final image = images.single;
+      expect(image.assetName, 'image.png');
+      expect(image.width, 4);
+      expect(image.height, 3);
+    });
+
+    test('metadata-only for TIFF', () {
+      final bytes = Uint8List.fromList([0x49, 0x49, 0x2A, 0x00]);
+      final result = registry.parse(bytes);
+      final viewer = const ImageViewBuilder().build(
+        request(result, bytes: bytes, filename: 'scan.tiff'),
+      );
+      expect(viewer.formatLabel, 'TIFF');
+      expect(viewer.notices.any((n) => n.message.contains('TIFF')), isTrue);
+      expect(viewer.sections.any((s) => s is ViewerImageSection), isFalse);
+    });
+
+    test('does not claim non-image formats', () {
+      final csv = parseCsv('name,value\nalpha,1');
+      expect(const ImageViewBuilder().supports(csv), isFalse);
+    });
+  });
+
+  group('EmailViewBuilder', () {
+    test('renders headers, body, and attachments without HTML', () {
+      final bytes = buildEmlWithAttachment();
+      final result = registry.parse(bytes);
+      expect(result.format, DocumentFormat.eml);
+      expect(result.metadata['subject'], 'Viewer message');
+      final viewer = const EmailViewBuilder().build(
+        request(result, bytes: bytes, filename: 'message.eml'),
+      );
+      expect(viewer.formatLabel, result.format.label);
+      expect(viewer.facts['Subject'], 'Viewer message');
+      expect(viewer.facts['From'], 'sender@example.com');
+      expect(viewer.facts['To'], 'recipient@example.com');
+      expect(
+        viewer.sections.any(
+          (s) => s is ViewerTextSection && s.text == 'Hello from the viewer.',
+        ),
+        isTrue,
+      );
+      final attachments = viewer.sections.whereType<ViewerTableSection>();
+      expect(attachments.single.rows.first, [
+        'report.pdf',
+        'application/pdf',
+        hasLength(greaterThan(0)),
+      ]);
+      expect(viewer.facts['Attachments'], isNotNull);
+      // HTML parts are never rendered — body stays escaped text.
+      expect(viewer.notices.any((n) => n.message.contains('HTML')), isFalse);
+    });
+
+    test('does not claim non-email formats', () {
+      final csv = parseCsv('name,value\nalpha,1');
+      expect(const EmailViewBuilder().supports(csv), isFalse);
+    });
+  });
+
+  group('PdfViewBuilder', () {
+    test('embeds the PDF asset and shows extracted text', () {
+      final bytes = buildSimplePdf(showText: 'Hello Panthalassa Vault');
+      final result = registry.parse(bytes);
+      expect(result.format, DocumentFormat.pdf);
+      final viewer = const PdfViewBuilder().build(
+        request(result, bytes: bytes, filename: 'report.pdf'),
+      );
+      expect(viewer.formatLabel, 'PDF');
+      expect(viewer.assets.keys, contains('document.pdf'));
+      final embed = viewer.sections.whereType<ViewerEmbedSection>();
+      expect(embed, isNotEmpty);
+      final textSection = viewer.sections.whereType<ViewerTextSection>();
+      expect(textSection.any((s) => s.text.contains('Hello')), isTrue);
+    });
+
+    test('shows extracted text only for encrypted PDFs', () {
+      final bytes = buildEncryptedPdf();
+      final result = registry.parse(bytes);
+      expect(result.metadata['encrypted'], true);
+      final viewer = const PdfViewBuilder().build(
+        request(result, bytes: bytes, filename: 'secret.pdf'),
+      );
+      expect(viewer.assets, isEmpty);
+      expect(viewer.sections.any((s) => s is ViewerEmbedSection), isFalse);
+      expect(
+        viewer.notices.any((n) => n.message.contains('encrypted')),
+        isTrue,
+      );
+    });
+
+    test('does not claim non-PDF formats', () {
+      final csv = parseCsv('name,value\nalpha,1');
+      expect(const PdfViewBuilder().supports(csv), isFalse);
+    });
+  });
+
+  group('StructuredSourceViewBuilder', () {
+    test('pretty-prints JSON and escapes before display', () {
+      final bytes = Uint8List.fromList(
+        utf8.encode('{"name":"<script>","count":2}'),
+      );
+      final result = registry.parse(bytes);
+      expect(result.format, DocumentFormat.json);
+      final viewer = const StructuredSourceViewBuilder().build(
+        request(result, bytes: bytes, filename: 'data.json'),
+      );
+      expect(viewer.formatLabel, 'JSON');
+      expect(viewer.sections.single, isA<ViewerTextSection>());
+      final text = (viewer.sections.single as ViewerTextSection).text;
+      expect(text, contains('{'));
+      expect(text, contains('"name": "<script>"'));
+      expect(text, contains('"count": 2'));
+      // HTML escaping happens at render time.
+      final html = const ViewerHtmlRenderer().render(viewer);
+      expect(html, contains('&lt;script&gt;'));
+    });
+
+    test('pretty-prints XML and NIEM', () {
+      final xmlBytes = Uint8List.fromList(
+        utf8.encode('<root><child>one</child></root>'),
+      );
+      final xmlResult = registry.parse(xmlBytes);
+      expect(xmlResult.format, DocumentFormat.xml);
+      final xmlViewer = const StructuredSourceViewBuilder().build(
+        request(xmlResult, bytes: xmlBytes, filename: 'data.xml'),
+      );
+      expect(xmlViewer.formatLabel, 'XML');
+      final xmlText = (xmlViewer.sections.single as ViewerTextSection).text;
+      expect(xmlText, contains('<root>'));
+
+      final niemBytes = Uint8List.fromList(
+        utf8.encode('{"nc:PersonName":{"nc:PersonGivenName":"Jane"}}'),
+      );
+      final niemResult = registry.parse(niemBytes);
+      expect(niemResult.format, DocumentFormat.niem);
+      expect(niemResult.metadata['profile'], 'NIEM JSON');
+      final niemViewer = const StructuredSourceViewBuilder().build(
+        request(niemResult, bytes: niemBytes, filename: 'niem.json'),
+      );
+      expect(niemViewer.formatLabel, 'NIEM');
+    });
+
+    test('truncates very large sources', () {
+      final big =
+          '{"items":[${List.generate(200000, (i) => '"item$i"').join(',')}]}';
+      final bytes = Uint8List.fromList(utf8.encode(big));
+      final result = registry.parse(bytes);
+      final viewer = const StructuredSourceViewBuilder().build(
+        request(result, bytes: bytes, filename: 'big.json'),
+      );
+      expect(
+        viewer.notices.any((n) => n.message.contains('truncated')),
+        isTrue,
+      );
+    });
+
+    test('does not claim non-structured formats', () {
+      final csv = parseCsv('name,value\nalpha,1');
+      expect(const StructuredSourceViewBuilder().supports(csv), isFalse);
+    });
+  });
+
+  group('DicomViewBuilder SR and no-pixel', () {
+    test('shows report text and table for Structured Report instances', () {
+      final bytes = buildDicomStructuredReport(
+        finding: 'Clear lungs, normal heart size',
+      );
+      final result = registry.parse(
+        bytes,
+        options: const ParseOptions(includeTables: true),
+      );
+      expect(result.format, DocumentFormat.dicom);
+      expect(result.metadata['hasPixelData'], isFalse);
+      final viewer = const DicomViewBuilder().build(
+        request(result, bytes: bytes, filename: 'report.dcm'),
+      );
+      expect(viewer.sections, isNotEmpty);
+      expect(
+        viewer.sections.any(
+          (s) => s is ViewerTextSection && s.text.contains('Clear lungs'),
+        ),
+        isTrue,
+      );
+      final tables = viewer.sections.whereType<ViewerTableSection>();
+      expect(tables, isNotEmpty);
+    });
+
+    test('degrades gracefully for a DICOM instance without Pixel Data', () {
+      final bytes = buildMinimalDicom();
+      final result = registry.parse(bytes);
+      final viewer = const DicomViewBuilder().build(
+        request(result, bytes: bytes, filename: 'meta.dcm'),
+      );
+      expect(viewer.sections, isEmpty);
+      expect(viewer.assets, isEmpty);
+      expect(
+        viewer.notices.map((notice) => notice.message).join(' '),
+        contains('no Pixel Data'),
+      );
     });
   });
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.2
+
+- **Viewer:** expanded `panthalassa view` with dedicated builders for XLSX/ODS
+  spreadsheets, raster image preview (JPEG/PNG/GIF/WebP/SVG), EML email,
+  PDF browser-native embedding, and structured JSON/XML/NIEM source. DICOM now
+  appends Structured Report text/tables for no-pixel/SR instances. Shared table
+  conversion lives in `viewerTableSection`; PDF embed uses an inline base64
+  payload decoded to a blob URL, with encrypted PDFs falling back to extracted
+  text.
+
 ## 0.5.1
 
 - **CLI:** new `panthalassa` executable with `detect`, `parse`, `render`,

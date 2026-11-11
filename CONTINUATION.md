@@ -1,6 +1,6 @@
 # Continuation — panthalassa_parsers
 
-Current version: **0.5.1**  
+Current version: **0.5.2**  
 Last updated: **2026-11-11**
 
 This file is the resume point for the parser/document-engine work. Read
@@ -9,7 +9,7 @@ surface.
 
 ## Current state
 
-The audit remediation and feature roadmap through v0.5.1 are implemented and
+The audit remediation and feature roadmap through v0.5.2 are implemented and
 covered by tests:
 
 - **Content addressing:** SHA-256, SHA-384, and SHA-512 are computed in one
@@ -37,8 +37,11 @@ covered by tests:
   opens it in the default browser. CSV/TSV renders as a sticky, filterable table
   (5,000 rows by default, `--all-rows` to override); DICOM renders decoded
   frames with window/level and support for uncompressed, RLE, and JPEG-baseline
-  data via `DicomParser.readImage` + `DicomPixelDecoder`. Other formats fall
-  back to semantic HTML. Viewer selection is extensible through
+  data via `DicomParser.readImage` + `DicomPixelDecoder`. Dedicated builders
+  handle XLSX/ODS spreadsheets, raster image preview (JPEG/PNG/GIF/WebP/SVG),
+  EML email, PDF browser-native embedding, and structured JSON/XML/NIEM source.
+  DICOM appends Structured Report text/tables for no-pixel/SR instances. Other
+  formats fall back to semantic HTML. Viewer selection is extensible through
   `ViewBuilder`/`ViewerRegistry`; `--out`, `--print-path`, `--raw`, `--json`,
   `--no-open`, and cache-root content addressing are supported.
 - **Verification:** `dart analyze`, `dart test`, the CLI smoke commands, and

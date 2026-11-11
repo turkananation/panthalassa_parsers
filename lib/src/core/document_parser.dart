@@ -10,7 +10,7 @@ import 'structured_artifacts.dart';
 ///
 /// Keep in lockstep with `pubspec.yaml`; vault migrations can use it to explain
 /// output-shape changes that were not covered by [ParseResult] schema bumps.
-const String parserImplementationVersion = '0.5.1';
+const String parserImplementationVersion = '0.5.2';
 
 /// Contract every format parser implements.
 ///
