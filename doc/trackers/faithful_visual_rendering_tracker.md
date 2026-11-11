@@ -30,7 +30,7 @@ package pure Dart, web-safe, and honest about unsupported format features.
 | PDF clipping/path/shading/masks | Not started | Clip paths, arbitrary paths, shadings, transparency, masks, blend modes represented or rendered. | Future conformance corpus. |
 | PDF font glyph outlines/rasterization | Not started | Embedded/CID font glyph shapes render accurately without native libraries. | Future dedicated package/suite. |
 | PDF image codec decode | Not started | DCT, JPX, CCITT, JBIG2 and color spaces decode or fail closed with diagnostics. | Future image fixture suite. |
-| DICOM pixel decode | Not started | Uncompressed baseline grayscale/RGB pixel data decodes to renderable frames with window/level metadata. | Future DICOM pixel fixtures. |
+| DICOM pixel decode | Complete initial (viewer path) | Uncompressed implicit/explicit LE, explicit BE, deflated, RLE, and JPEG-baseline frames decode to PNG with rescale/windowing; unsupported codecs fail closed with notices. | `lib/src/parsers/dicom/dicom_image.dart`; `test/dicom_image_test.dart`; CLI `view`. |
 | NITF pixel/tile decode | Not started | NITF image segments decode/lazily tile with safe resource limits. | Future NITF imagery fixtures. |
 | Flutter canvas adapter | Not started | Separate Flutter layer maps display-list commands to `CustomPainter`, selection/search overlay, and lazy pages. | Flutter widget tests/screenshots. |
 | Jaspr visual adapter | Not started | Separate Jaspr/web layer consumes SVG or typed display-list components safely. | Jaspr smoke test. |
@@ -39,7 +39,9 @@ package pure Dart, web-safe, and honest about unsupported format features.
 
 The engine can now emit a faithful-rendering substrate: page geometry plus a
 bounded display list. PDF pages with simple positioned text can render to SVG.
-Image-bearing binary formats expose placeholders when dimensions are known.
+Image-bearing binary formats expose placeholders when dimensions are known. The
+DICOM viewer has a separate PNG decode path for supported pixel syntaxes; it is
+not yet projected into the shared display list.
 
 This is not yet a full pixel rasterizer. Unsupported visual PDF operators and
 undecoded image codecs must remain visible in diagnostics until implemented and

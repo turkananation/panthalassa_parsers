@@ -29,10 +29,18 @@ covered by tests:
 - **Detection:** strong binary magic runs before permissive text heuristics.
   Markdown and CSV/TSV are hint-gated and never claim arbitrary text. Hint-only
   matches are reported with high confidence and `hint-match` evidence.
-- **CLI:** `panthalassa` provides `detect`, `parse`, `render`, `batch`, `digest`,
-  `formats`, and `version`, with JSON/text modes, stdin support, hints, strict
-  limits, and per-file batch output. CLI code is confined to `bin/`; `lib/`
-  remains pure Dart and web-safe.
+- **CLI:** `panthalassa` provides `detect`, `parse`, `render`, `view`, `batch`,
+  `digest`, `formats`, and `version`, with JSON/text modes, stdin support, hints,
+  strict limits, and per-file batch output. CLI code is confined to `bin/`;
+  `lib/` remains pure Dart and web-safe.
+- **Viewer:** `panthalassa view` generates a self-contained HTML document and
+  opens it in the default browser. CSV/TSV renders as a sticky, filterable table
+  (5,000 rows by default, `--all-rows` to override); DICOM renders decoded
+  frames with window/level and support for uncompressed, RLE, and JPEG-baseline
+  data via `DicomParser.readImage` + `DicomPixelDecoder`. Other formats fall
+  back to semantic HTML. Viewer selection is extensible through
+  `ViewBuilder`/`ViewerRegistry`; `--out`, `--print-path`, `--raw`, `--json`,
+  `--no-open`, and cache-root content addressing are supported.
 - **Verification:** `dart analyze`, `dart test`, the CLI smoke commands, and
   `dart compile js` on `tool/web_smoke.dart` are expected to be green. CI pins
   Dart 3.13.5 and checks that the generated CLI version matches `pubspec.yaml`.
@@ -44,8 +52,11 @@ These are deliberate scope boundaries, not regressions:
 - **PDF rendering** is a display-list foundation, not pixel-faithful
   rasterization. Glyph outlines, arbitrary transforms, clipping, shadings,
   masks, blend modes, and DCT/JPX/CCITT/JBIG2 image codecs are not implemented.
-- **DICOM/NITF pixels** are never decoded. Visual output uses placeholder
-  commands based on known geometry.
+- **DICOM pixel rendering** covers uncompressed implicit/explicit LE, explicit
+  BE, deflated, RLE, and JPEG-baseline data, with a 2048px output cap and a
+  16M-input-pixel guard. JPEG-LS, JPEG 2000, JPEG lossless, PALETTE COLOR, and
+  some RLE/YBR combinations are not decoded and surface viewer notices. NITF
+  pixels are still never decoded; its visual output remains a placeholder.
 - **DICOM dictionary** covers common attributes and keywords, but is not an
   exhaustive generated PS3.6 table.
 - **NITF/STANAG** extraction is conservative. Tactical word semantics, dense
@@ -68,11 +79,13 @@ These are deliberate scope boundaries, not regressions:
 Ordered by value for the vault pipeline:
 
 1. **Faithful visual rendering track:** complete the PDF display list
-   (transforms/clipping/text positioning), add raster/image codec support, then
-   project DICOM/NITF frames into renderable pages.
+   (transforms/clipping/text positioning), add raster/image codec support
+   (JPEG-LS/JPEG 2000/lossless, NITF), and project DICOM/NITF frames into
+   `VisualDocument` so every renderer shares one pipeline.
 2. **Adapter packages:** Flutter `DocumentView` and Jaspr/HTML adapters that
    consume `DocumentIr`/`VisualDocument` without adding framework dependencies
-   to this core package.
+   to this core package; a warm native popup/daemon can later replace the
+   generated-HTML browser handoff.
 3. **Standards depth:** exhaustive DICOM PS3.6 dictionary generation, fuller
    STANAG/NITF bodies, ISO 20022 ASN.1, and additional OOXML/ODF edge cases.
 4. **CLI polish:** shell completions, a `--watch` batch mode, and richer
@@ -97,6 +110,7 @@ dart test
 dart run bin/panthalassa.dart version --json
 dart run bin/panthalassa.dart formats --json >/dev/null
 dart run bin/panthalassa.dart parse README.md --json >/dev/null
+dart run bin/panthalassa.dart view README.md --no-open --out /tmp/readme.view.html --json >/dev/null
 dart compile js -O2 -o /tmp/panthalassa_web_smoke.js tool/web_smoke.dart
 ```
 

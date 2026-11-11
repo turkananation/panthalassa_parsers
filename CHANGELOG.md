@@ -3,11 +3,20 @@
 ## 0.5.1
 
 - **CLI:** new `panthalassa` executable with `detect`, `parse`, `render`,
-  `batch`, `digest`, `formats`, and `version` commands; styled ANSI console,
-  `--json`/`--text`/`--metadata` modes, stdin (`-`) support, detection hints,
-  strict resource ceilings, bounded batch isolates, per-file JSON output, SVG
-  visual export, and `sysexits.h`-style exit codes. `args` is used only by
+  `view`, `batch`, `digest`, `formats`, and `version` commands; styled ANSI
+  console, `--json`/`--text`/`--metadata` modes, stdin (`-`) support, detection
+  hints, strict resource ceilings, bounded batch isolates, per-file JSON output,
+  SVG visual export, and `sysexits.h`-style exit codes. `args` is used only by
   `bin/`.
+- **Viewer:** generated self-contained HTML documents with a sticky, filterable
+  CSV/TSV table view and a DICOM image view. The DICOM path adds
+  `DicomParser.readImage` and a reusable `DicomPixelDecoder` for uncompressed
+  (implicit/explicit LE, explicit BE, deflated), RLE, and JPEG-baseline data,
+  with rescale/window handling, MONOCHROME1 inversion, YBR conversion, bounded
+  frame rendering, and PNG output. JPEG-LS, JPEG 2000, and JPEG lossless remain
+  unsupported and degrade to metadata-only notices. Viewer selection is
+  extensible through `ViewBuilder`/`ViewerRegistry`; other formats fall back to
+  semantic HTML.
 - **Content addressing:** `ParseResult` now carries SHA-256, SHA-384, and
   SHA-512 via `ContentDigest`/`PqBytesContentHasher`; `documentId` remains the
   SHA-256 hex string for vault compatibility. Results also stamp
@@ -31,8 +40,8 @@
 - **Packaging and CI:** standalone package resolution, Dart 3.13.5 CI, CLI
   version generation/check, CLI smoke coverage, web compile smoke target, and
   pub.dev-facing metadata/example fixes. Dependencies now floor at
-  `archive` 4.6 and `xml` 7.1, and the web/WASM hash backend avoids pqforge's
-  `dart:isolate` barrel while producing identical digests.
+  `archive` 4.6, `image` 4.12, and `xml` 7.1, and the web/WASM hash backend
+  avoids pqforge's `dart:isolate` barrel while producing identical digests.
 
 ## 0.5.0
 

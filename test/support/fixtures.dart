@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:image/image.dart' as img;
 
 /// Test fixture builders that synthesise minimal-but-valid documents, so the
 /// suite has no binary asset dependencies and every byte is auditable.
@@ -45,6 +46,288 @@ Uint8List buildMinimalDicom() {
   b.add(elem(0x0008, 0x0060, 'CS', ascii.encode('CT'))); // Modality
   b.add(elem(0x0010, 0x0010, 'PN', ascii.encode('DOE^JANE'))); // PatientName
   return b.toBytes();
+}
+
+List<int> _dicomUi(String value) {
+  final bytes = ascii.encode(value).toList();
+  if (bytes.length.isOdd) bytes.add(0x00);
+  return bytes;
+}
+
+List<int> _dicomString(String value) {
+  final bytes = ascii.encode(value).toList();
+  if (bytes.length.isOdd) bytes.add(0x20);
+  return bytes;
+}
+
+List<int> _dicomElement(int group, int element, String vr, List<int> value) {
+  assert(value.length.isEven, 'DICOM values must be even length');
+  return [
+    ..._le16(group),
+    ..._le16(element),
+    ...ascii.encode(vr),
+    ..._le16(value.length),
+    ...value,
+  ];
+}
+
+List<int> _dicomBe16(int value) => [(value >> 8) & 0xFF, value & 0xFF];
+
+List<int> _dicomBe32(int value) => [
+  (value >> 24) & 0xFF,
+  (value >> 16) & 0xFF,
+  (value >> 8) & 0xFF,
+  value & 0xFF,
+];
+
+const Set<String> _longDicomVrs = {
+  'OB',
+  'OD',
+  'OF',
+  'OL',
+  'OV',
+  'OW',
+  'SQ',
+  'UC',
+  'UR',
+  'UT',
+  'UN',
+};
+
+List<int> _dicomSyntaxElement(
+  int group,
+  int element,
+  String vr,
+  List<int> value, {
+  required bool implicit,
+  required Endian endian,
+}) {
+  assert(value.length.isEven, 'DICOM values must be even length');
+  final u16 = endian == Endian.little ? _le16 : _dicomBe16;
+  final u32 = endian == Endian.little ? _le32 : _dicomBe32;
+  final tag = [...u16(group), ...u16(element)];
+  if (implicit) return [...tag, ...u32(value.length), ...value];
+  if (_longDicomVrs.contains(vr)) {
+    return [...tag, ...ascii.encode(vr), 0, 0, ...u32(value.length), ...value];
+  }
+  return [...tag, ...ascii.encode(vr), ...u16(value.length), ...value];
+}
+
+Uint8List _dicomPart10({
+  required String transferSyntax,
+  required List<int> dataset,
+}) {
+  final out = BytesBuilder()
+    ..add(Uint8List(128))
+    ..add(ascii.encode('DICM'))
+    ..add(_dicomElement(0x0002, 0x0010, 'UI', _dicomUi(transferSyntax)))
+    ..add(dataset);
+  return out.toBytes();
+}
+
+/// Builds a native (uncompressed) DICOM image.
+///
+/// Defaults to explicit VR little endian. Set [implicitVr], [endian], or
+/// [deflated] to exercise the other uncompressed transfer syntaxes. Pixel bytes
+/// are supplied verbatim so tests can cover 8-bit, 16-bit, signed, RGB, and
+/// planar layouts without an external file.
+Uint8List buildDicomImage({
+  required int rows,
+  required int columns,
+  required List<int> pixelBytes,
+  int bitsAllocated = 8,
+  int? bitsStored,
+  int? highBit,
+  int pixelRepresentation = 0,
+  int samplesPerPixel = 1,
+  String photometricInterpretation = 'MONOCHROME2',
+  int planarConfiguration = 0,
+  int numberOfFrames = 1,
+  double? windowCenter,
+  double? windowWidth,
+  double? rescaleSlope,
+  double? rescaleIntercept,
+  String modality = 'CT',
+  String patientName = 'DOE^JANE',
+  String transferSyntax = '1.2.840.10008.1.2.1',
+  bool implicitVr = false,
+  Endian endian = Endian.little,
+  bool deflated = false,
+  bool zlibWrapped = false,
+}) {
+  final stored = bitsStored ?? bitsAllocated;
+  final high = highBit ?? stored - 1;
+  final pixels = [...pixelBytes];
+  if (pixels.length.isOdd) pixels.add(0);
+  List<int> element(int group, int element, String vr, List<int> value) =>
+      _dicomSyntaxElement(
+        group,
+        element,
+        vr,
+        value,
+        implicit: implicitVr,
+        endian: endian,
+      );
+  List<int> us(int value) =>
+      endian == Endian.big ? _dicomBe16(value) : _le16(value);
+  final dataset = <int>[
+    ...element(0x0008, 0x0060, 'CS', _dicomString(modality)),
+    ...element(0x0010, 0x0010, 'PN', _dicomString(patientName)),
+    ...element(0x0028, 0x0002, 'US', us(samplesPerPixel)),
+    ...element(0x0028, 0x0004, 'CS', _dicomString(photometricInterpretation)),
+    ...element(0x0028, 0x0006, 'US', us(planarConfiguration)),
+    ...element(0x0028, 0x0008, 'IS', _dicomString('$numberOfFrames')),
+    ...element(0x0028, 0x0010, 'US', us(rows)),
+    ...element(0x0028, 0x0011, 'US', us(columns)),
+    ...element(0x0028, 0x0100, 'US', us(bitsAllocated)),
+    ...element(0x0028, 0x0101, 'US', us(stored)),
+    ...element(0x0028, 0x0102, 'US', us(high)),
+    ...element(0x0028, 0x0103, 'US', us(pixelRepresentation)),
+    if (windowCenter != null)
+      ...element(0x0028, 0x1050, 'DS', _dicomString('$windowCenter')),
+    if (windowWidth != null)
+      ...element(0x0028, 0x1051, 'DS', _dicomString('$windowWidth')),
+    if (rescaleIntercept != null)
+      ...element(0x0028, 0x1052, 'DS', _dicomString('$rescaleIntercept')),
+    if (rescaleSlope != null)
+      ...element(0x0028, 0x1053, 'DS', _dicomString('$rescaleSlope')),
+    ...element(0x7FE0, 0x0010, 'OW', pixels),
+  ];
+  final syntax = implicitVr
+      ? '1.2.840.10008.1.2'
+      : endian == Endian.big
+      ? '1.2.840.10008.1.2.2'
+      : deflated
+      ? '1.2.840.10008.1.2.1.99'
+      : transferSyntax;
+  final zlib = const ZLibEncoder().encode(dataset);
+  final body = !deflated
+      ? dataset
+      : zlibWrapped
+      ? zlib
+      // PS3.5 requires raw deflate: strip the RFC 1950 header and Adler-32.
+      : zlib.sublist(2, zlib.length - 4);
+  return _dicomPart10(transferSyntax: syntax, dataset: body);
+}
+
+/// Builds an encapsulated DICOM image with a single frame fragment.
+Uint8List buildEncapsulatedDicomImage({
+  required int rows,
+  required int columns,
+  required List<int> frame,
+  required String transferSyntax,
+  int samplesPerPixel = 1,
+  String photometricInterpretation = 'MONOCHROME2',
+  int bitsAllocated = 8,
+  int? bitsStored,
+  int? highBit,
+}) {
+  final stored = bitsStored ?? bitsAllocated;
+  final high = highBit ?? stored - 1;
+  final fragment = [...frame];
+  if (fragment.length.isOdd) fragment.add(0);
+  final dataset = <int>[
+    ..._dicomElement(0x0008, 0x0060, 'CS', _dicomString('CT')),
+    ..._dicomElement(0x0010, 0x0010, 'PN', _dicomString('DOE^JANE')),
+    ..._dicomElement(0x0028, 0x0002, 'US', _le16(samplesPerPixel)),
+    ..._dicomElement(
+      0x0028,
+      0x0004,
+      'CS',
+      _dicomString(photometricInterpretation),
+    ),
+    ..._dicomElement(0x0028, 0x0008, 'IS', _dicomString('1')),
+    ..._dicomElement(0x0028, 0x0010, 'US', _le16(rows)),
+    ..._dicomElement(0x0028, 0x0011, 'US', _le16(columns)),
+    ..._dicomElement(0x0028, 0x0100, 'US', _le16(bitsAllocated)),
+    ..._dicomElement(0x0028, 0x0101, 'US', _le16(stored)),
+    ..._dicomElement(0x0028, 0x0102, 'US', _le16(high)),
+    ..._dicomElement(0x0028, 0x0103, 'US', _le16(0)),
+    // Encapsulated Pixel Data.
+    ..._le16(0x7FE0),
+    ..._le16(0x0010),
+    ...ascii.encode('OB'),
+    0,
+    0,
+    ..._le32(0xFFFFFFFF),
+    // Empty basic offset table, single frame fragment, sequence delimiter.
+    ..._le16(0xFFFE),
+    ..._le16(0xE000),
+    ..._le32(0),
+    ..._le16(0xFFFE),
+    ..._le16(0xE000),
+    ..._le32(fragment.length),
+    ...fragment,
+    ..._le16(0xFFFE),
+    ..._le16(0xE0DD),
+    ..._le32(0),
+  ];
+  return _dicomPart10(transferSyntax: transferSyntax, dataset: dataset);
+}
+
+/// Builds an RLE Lossless DICOM frame. The payload is a literal PackBits run,
+/// which keeps the fixture readable while exercising the real RLE path.
+Uint8List buildDicomRleImage({
+  int rows = 2,
+  int columns = 2,
+  List<int> pixels = const [0, 85, 170, 255],
+}) {
+  final header = List<int>.filled(64, 0);
+  void putOffset(int index, int value) {
+    final bytes = _le32(value);
+    header.setRange(index * 4, index * 4 + 4, bytes);
+  }
+
+  putOffset(0, 64);
+  final encoded = <int>[pixels.length - 1, ...pixels];
+  final frame = <int>[...header, ...encoded];
+  if (frame.length.isOdd) frame.add(0);
+  return buildEncapsulatedDicomImage(
+    rows: rows,
+    columns: columns,
+    frame: frame,
+    transferSyntax: '1.2.840.10008.1.2.5',
+  );
+}
+
+/// Builds a JPEG Baseline DICOM frame from a small generated RGB image.
+Uint8List buildDicomJpegImage({
+  int rows = 2,
+  int columns = 2,
+  List<int> rgba = const [
+    255,
+    0,
+    0,
+    255,
+    0,
+    255,
+    0,
+    255,
+    0,
+    0,
+    255,
+    255,
+    255,
+    255,
+    255,
+    255,
+  ],
+}) {
+  final image = img.Image.fromBytes(
+    width: columns,
+    height: rows,
+    bytes: Uint8List.fromList(rgba).buffer,
+    numChannels: 4,
+  );
+  final jpeg = img.encodeJpg(image);
+  return buildEncapsulatedDicomImage(
+    rows: rows,
+    columns: columns,
+    frame: jpeg,
+    transferSyntax: '1.2.840.10008.1.2.4.50',
+    samplesPerPixel: 3,
+    photometricInterpretation: 'YBR_FULL_422',
+  );
 }
 
 /// Builds a DICOM Part 10 file with a multi-valued string and an

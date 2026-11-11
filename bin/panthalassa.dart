@@ -18,6 +18,7 @@ import 'src/console.dart';
 import 'src/digest_command.dart';
 import 'src/inspect_commands.dart';
 import 'src/parse_commands.dart';
+import 'src/view_command.dart';
 
 const _description =
     'Content-addressed document intake for the Panthalassa Vault: detect, '
@@ -27,7 +28,7 @@ const _description =
 /// Display order and grouping for the styled top-level help.
 const Map<String, List<String>> _groups = {
   'Inspect': ['detect', 'formats'],
-  'Parse & render': ['parse', 'render', 'batch'],
+  'Parse & render': ['parse', 'render', 'view', 'batch'],
   'Content address': ['digest'],
   'Maintenance': ['version'],
 };
@@ -118,6 +119,7 @@ final class PanthalassaRunner extends CommandRunner<void> {
     addCommand(FormatsCommand());
     addCommand(ParseCommand());
     addCommand(RenderCommand());
+    addCommand(ViewCommand());
     addCommand(BatchCommand());
     addCommand(DigestCommand());
     addCommand(VersionCommand());
@@ -203,6 +205,10 @@ final class PanthalassaRunner extends CommandRunner<void> {
       '  ${ansi.gray('# Render escaped HTML or a visual SVG preview')}',
       '  panthalassa render report.pdf --format html --out report.html',
       '  panthalassa render report.pdf --format svg --out report.svg',
+      '',
+      '  ${ansi.gray('# Open a filterable CSV table or a DICOM image viewer')}',
+      '  panthalassa view report.csv',
+      '  panthalassa view scan.dcm --window-center 40 --window-width 400',
       '',
       '  ${ansi.dim('Docs')}    https://github.com/turkananation/panthalassa_parsers',
       '  ${ansi.dim('Digest')}  SHA-256 is the canonical documentId; SHA-384/512 '

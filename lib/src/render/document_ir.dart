@@ -48,6 +48,7 @@ final class DocumentIr extends DocNode {
         }
       }
     }
+    body.addAll(_tableBlocks(result));
     return DocumentIr(
       sourceFormat: result.format,
       metadata: result.metadata,
@@ -203,6 +204,20 @@ String _metadataValue(Object? value) {
 Iterable<MapEntry<String, Object?>> _semanticMetadata(
   Map<String, Object?> metadata,
 ) => metadata.entries.where((entry) => entry.key != 'visualPages');
+
+List<TableBlock> _tableBlocks(ParseResult result) => [
+  for (final table in result.tables)
+    if (table.rows.isNotEmpty)
+      TableBlock([
+        for (var row = 0; row < table.rows.length; row++)
+          [
+            for (final cell in table.rows[row])
+              TableCell([
+                ParagraphBlock([TextRun(cell)]),
+              ], header: row == 0),
+          ],
+      ]),
+];
 
 List<RawVisualBlock> _visualBlocks(ParseResult result) {
   final blocks = <RawVisualBlock>[];

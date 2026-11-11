@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -5,7 +6,10 @@ import 'dart:typed_data';
 import 'package:panthalassa_parsers/panthalassa_parsers.dart';
 import 'package:test/test.dart';
 
+import '../bin/panthalassa.dart';
+import '../bin/src/console.dart';
 import '../bin/src/support.dart';
+import 'support/fixtures.dart';
 
 void main() {
   group('CLI formatting helpers', () {
@@ -65,6 +69,108 @@ void main() {
         includeExtensions: {'pdf'},
       );
       expect(deep.map((input) => baseName(input.path)), ['a.pdf', 'c.pdf']);
+    });
+  });
+
+  group('view command', () {
+    Future<({String stdout, String stderr})> runView(List<String> args) async {
+      final out = StreamController<List<int>>(sync: true);
+      final err = StreamController<List<int>>(sync: true);
+      final outBytes = <int>[];
+      final errBytes = <int>[];
+      final outSub = out.stream.listen(outBytes.addAll);
+      final errSub = err.stream.listen(errBytes.addAll);
+      final outSink = IOSink(out);
+      final errSink = IOSink(err);
+      final previous = Console.instance;
+      Console.configure(color: false, out: outSink, err: errSink);
+      try {
+        await PanthalassaRunner().run(['view', ...args]);
+        await outSink.flush();
+        await errSink.flush();
+      } finally {
+        Console.instance = previous;
+        await outSub.cancel();
+        await errSub.cancel();
+        await out.close();
+        await err.close();
+      }
+      return (stdout: utf8.decode(outBytes), stderr: utf8.decode(errBytes));
+    }
+
+    test('writes CSV viewer HTML and reports JSON metadata', () async {
+      final directory = await Directory.systemTemp.createTemp('ptp-view-');
+      addTearDown(() => directory.delete(recursive: true));
+      final csv = File('${directory.path}/people.csv')
+        ..writeAsStringSync('name,value\nalpha,1\nbeta,2');
+      final out = '${directory.path}/people.view.html';
+
+      final result = await runView([
+        csv.path,
+        '--no-open',
+        '--out',
+        out,
+        '--json',
+      ]);
+
+      expect(result.stderr, isEmpty);
+      final payload = jsonDecode(result.stdout) as Map<String, Object?>;
+      expect(payload['format'], 'csv');
+      expect(payload['builder'], 'csv');
+      expect(payload['output'], out);
+      expect(payload['opened'], isFalse);
+      expect(payload['viewerBytes'], greaterThan(1000));
+
+      final html = File(out).readAsStringSync();
+      expect(html, startsWith('<!doctype html>'));
+      expect(html, contains('<table'));
+      expect(html, contains('alpha'));
+      expect(html, contains('Filter rows'));
+    });
+
+    test('prints only the viewer path for DICOM', () async {
+      final directory = await Directory.systemTemp.createTemp('ptp-view-');
+      addTearDown(() => directory.delete(recursive: true));
+      final dicom = File('${directory.path}/scan.dcm')
+        ..writeAsBytesSync(
+          buildDicomImage(
+            rows: 1,
+            columns: 2,
+            pixelBytes: [0, 255],
+            windowCenter: 128,
+            windowWidth: 256,
+          ),
+        );
+      final out = '${directory.path}/scan.view.html';
+
+      final result = await runView([
+        dicom.path,
+        '--no-open',
+        '--out',
+        out,
+        '--print-path',
+      ]);
+
+      expect(result.stderr, isEmpty);
+      expect(result.stdout.trim(), out);
+      final html = File(out).readAsStringSync();
+      expect(html, contains('data:image/png;base64,'));
+      expect(html, contains('CT'));
+    });
+
+    test('streams raw HTML for piping', () async {
+      final directory = await Directory.systemTemp.createTemp('ptp-view-');
+      addTearDown(() => directory.delete(recursive: true));
+      final csv = File('${directory.path}/rows.csv')
+        ..writeAsStringSync('name,value\nalpha,1');
+
+      final result = await runView([csv.path, '--raw']);
+
+      expect(result.stderr, isEmpty);
+      final html = result.stdout;
+      expect(html, startsWith('<!doctype html>'));
+      expect(html, contains('alpha'));
+      expect(html, isNot(contains('created')));
     });
   });
 

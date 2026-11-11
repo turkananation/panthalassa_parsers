@@ -29,6 +29,7 @@ executables:
 dependencies:
   archive: ^4.6.0   # pure-Dart ZIP + inflate (ODF container, PDF FlateDecode); no dart:io
   args: ^2.7.0      # CLI argument/subcommand parsing (bin/ only)
+  image: ^4.12.0    # JPEG decode + PNG encode for DICOM pixel rendering; pure Dart
   meta: ^1.16.0
   pointycastle: ^4.0.0  # SHA-2 digests for the web/WASM hash backend
   pqforge: ^0.4.14  # PqBytes SHA-256/SHA-384/SHA-512 — native hash path

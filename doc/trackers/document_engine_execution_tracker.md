@@ -46,7 +46,7 @@ DIR/render engine that feeds Flutter and Jaspr UI adapters.
 | Standalone package resolution | Complete | Package resolves with no workspace declaration; CI uses plain `dart pub get`. | `.github/workflows/ci.yml`; local `dart pub get`. |
 | Dart 3.13.5 CI | Complete | CI pins the supported SDK and satisfies `pqforge`'s floor. | `.github/workflows/ci.yml`. |
 | I18N/stable issue messages | Complete | Stable machine-readable issue codes and documented UI-side localization path. | `doc/ISSUE_CODES.md`. |
-| CLI command surface | Complete | `detect`, `parse`, `render`, `batch`, `digest`, `formats`, `version`; JSON/text modes, stdin, hints, strict limits, batch output. | `bin/panthalassa.dart`; `test/cli_test.dart`; CLI smoke commands. |
+| CLI command surface | Complete | `detect`, `parse`, `render`, `view`, `batch`, `digest`, `formats`, `version`; JSON/text modes, stdin, hints, strict limits, batch output, self-contained viewer. | `bin/panthalassa.dart`; `test/cli_test.dart`; CLI smoke commands. |
 | CLI version generation | Complete | `bin/src/version.g.dart` generated from `pubspec.yaml`; CI checks drift. | `tool/version/generate_version.dart`; `.github/workflows/ci.yml`. |
 
 ## Render Engine Track
@@ -60,9 +60,10 @@ DIR/render engine that feeds Flutter and Jaspr UI adapters.
 | PDF visual page extraction | Complete initial | Surface page boxes and conservative text/rect/image-placeholder display-list commands without claiming full rasterization. | `lib/src/parsers/pdf/pdf_visual.dart`; `test/render_engine_test.dart`. |
 | SVG visual renderer | Complete initial | Framework-free faithful preview/export output for display-list pages. | `lib/src/render/visual_renderer.dart`; `test/render_engine_test.dart`; CLI `render --format svg`. |
 | NITF/DICOM visual placeholders | Complete initial | Project known image/frame dimensions into visual pages until pixel codecs land. | `test/render_engine_test.dart`. |
+| DICOM viewer pixel path | Complete initial | Decode supported syntaxes to windowed PNG for self-contained HTML; unsupported codecs degrade to metadata-only notices. | `lib/src/parsers/dicom/dicom_image.dart`; `test/dicom_image_test.dart`; `test/viewer_test.dart`; CLI `view`. |
 | Flutter adapter | Not started | Separate adapter package/app layer; sliver/lazy `DocumentView`, accessibility, search. | Flutter tests/screenshots. |
 | Jaspr adapter | Not started | HTML/component adapter that consumes pure-Dart DIR/render tree without duplicating parser logic. | Jaspr smoke test. |
-| Faithful visual rendering | Started | Display-list substrate exists. Full PDF rasterization and DICOM/NITF pixel decode remain scoped follow-up work. | `doc/trackers/faithful_visual_rendering_tracker.md`; `CONTINUATION.md`. |
+| Faithful visual rendering | Started | Display-list substrate and a DICOM viewer PNG path exist. Full PDF rasterization, shared DICOM projection, and NITF pixel decode remain scoped follow-up work. | `doc/trackers/faithful_visual_rendering_tracker.md`; `CONTINUATION.md`. |
 
 ## Remaining Work
 

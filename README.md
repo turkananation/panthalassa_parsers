@@ -102,6 +102,7 @@ dart run bin/panthalassa.dart --help
 | `detect <file>` | Format, confidence, and evidence. `--filename` / `--mime` disambiguate. |
 | `parse <file>` | Full parse with a human summary, `--json`, `--text`, or `--metadata`. |
 | `render <file>` | Text, Markdown, escaped HTML, or SVG (`--format`). |
+| `view <file>` | Self-contained HTML viewer; filterable CSV/TSV tables and windowed DICOM images. Opens the browser by default. |
 | `batch <path>...` | Files/directories with bounded isolate concurrency, `--recursive`, `--include`, `--out-dir`, `--json`, and `--fail-fast`. |
 | `digest <file>...` | SHA-256/384/512 content addresses, `--algo`, `--short`, and `--expect` verification. |
 | `formats [query]` | Supported formats, capabilities, detection hints, and parser families. |
@@ -128,6 +129,11 @@ panthalassa batch inbox/ --recursive --include pdf,docx --out-dir parsed/
 # Semantic and visual previews
 panthalassa render report.pdf --format markdown
 panthalassa render report.pdf --format svg --out report.svg
+
+# Self-contained HTML viewer (browser opens unless --no-open)
+panthalassa view measurements.csv
+panthalassa view scan.dcm --frame 3 --window-center 40 --window-width 400
+panthalassa view scan.dcm --no-open --out scan.view.html --print-path
 ```
 
 `parse --json` emits the `ParseResult` JSON governed by
@@ -169,28 +175,36 @@ UI-side localization; see `doc/ISSUE_CODES.md`.
 
 Text, metadata, and structural extraction are complete for common cases across
 the formats above. DICOM extracts Structured Report content trees and can parse
-encapsulated PDF/CDA documents when `ParseOptions.parseAttachments` is enabled;
-pixel data is never decoded. CDA walks nested sections, narrative tables, and
-inline `observationMedia`. ISO 20022 surfaces group headers, parties, accounts,
-transaction tables, and per-currency totals. OOXML and ODF expose sheets, slides,
-tables, and embedded media without rendering fidelity. EPUB reads the OCF/OPF
-spine and navigation documents but does not decrypt DRM or execute scripts.
-Image parsers read container metadata only; they do not decode pixels or execute
-SVG scripts/external references.
+encapsulated PDF/CDA documents when `ParseOptions.parseAttachments` is enabled.
+`DicomParser.readImage` additionally extracts pixel payloads for the built-in
+viewer; ordinary `parse` remains metadata-only. CDA walks nested sections,
+narrative tables, and inline `observationMedia`. ISO 20022 surfaces group
+headers, parties, accounts, transaction tables, and per-currency totals. OOXML
+and ODF expose sheets, slides, tables, and embedded media without rendering
+fidelity. EPUB reads the OCF/OPF spine and navigation documents but does not
+decrypt DRM or execute scripts. Image parsers other than DICOM read container
+metadata only; they do not decode pixels or execute SVG scripts/external
+references.
 
 The render engine has a pure-Dart DIR plus text, Markdown, escaped HTML, and a
 visual display-list layer. PDF parse results expose page geometry and
 conservative text/rectangle/image-placeholder commands; NITF and DICOM metadata
-project to image/frame placeholders when dimensions are known. `SvgVisualRenderer`
-provides a framework-free preview/export path, and Flutter/Jaspr adapters should
-consume the same semantic and visual models without adding framework dependencies
-to this core package.
+project to image/frame placeholders when dimensions are known. The separate
+`view` pipeline decodes DICOM frames to PNG for its self-contained viewer rather
+than routing them through the display-list layer. `SvgVisualRenderer` provides a
+framework-free preview/export path, and Flutter/Jaspr adapters should consume the
+same semantic and visual models without adding framework dependencies to this
+core package.
 
 Full pixel-faithful PDF rasterization remains a larger track: glyph outlines,
 transforms, clipping, shadings, masks, blend modes, and image codecs are not yet
-complete. DICOM/NITF pixel decode is also not complete. This package performs no
-sealing, signing, key custody, signature verification, or network access; it only
-content-addresses the bytes it parses.
+complete. The DICOM viewer decodes uncompressed (implicit/explicit little
+endian, explicit big endian, deflated), RLE, and JPEG-baseline pixel data,
+applies rescale/window values, and downsamples large frames for its PNG output.
+JPEG-LS, JPEG 2000, and JPEG lossless remain unsupported, and NITF pixels are
+still not decoded. This package performs no sealing, signing, key custody,
+signature verification, or network access; it only content-addresses the bytes
+it parses.
 
 ## Develop
 
