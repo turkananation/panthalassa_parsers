@@ -11,21 +11,17 @@ void main() {
 
   group('malformed input hardening', () {
     for (final entry in _fixtures().entries) {
-      test(
-        '${entry.key} truncations and bit flips stay typed',
-        () {
-          for (final sample in _mutations(entry.value)) {
-            try {
-              registry.parse(sample);
-            } on ParseException {
-              // Expected for malformed recognised inputs and unsupported formats.
-            } catch (e, st) {
-              fail('untyped error for ${entry.key}: $e\n$st');
-            }
+      test('${entry.key} truncations and bit flips stay typed', () {
+        for (final sample in _mutations(entry.value)) {
+          try {
+            registry.parse(sample);
+          } on ParseException {
+            // Expected for malformed recognised inputs and unsupported formats.
+          } catch (e, st) {
+            fail('untyped error for ${entry.key}: $e\n$st');
           }
-        },
-        timeout: const Timeout(Duration(seconds: 2)),
-      );
+        }
+      }, timeout: const Timeout(Duration(seconds: 2)));
     }
   });
 }

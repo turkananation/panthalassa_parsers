@@ -5,8 +5,11 @@ import '../core/content_hasher.dart';
 import '../core/document_format.dart';
 import '../core/document_parser.dart';
 import '../core/parse_exception.dart';
+import '../core/parse_options.dart';
 import '../core/parse_result.dart';
+import '../core/structured_artifacts.dart';
 import 'pdf/pdf_internals.dart';
+import 'pdf/pdf_metadata.dart';
 import 'pdf/pdf_text.dart';
 import 'pdf/pdf_visual.dart';
 
@@ -15,13 +18,15 @@ import 'pdf/pdf_visual.dart';
 /// Extracts per-page text — decrypting RC4/AES-protected documents, decoding
 /// object and cross-reference streams, resolving font encodings and ToUnicode
 /// maps, and recursing into form XObjects — plus document metadata, permission
-/// flags, and PDF/A-3 associated files (whose XML/JSON payloads are folded into
-/// the extracted text).
-final class PdfParser implements DocumentParser {
+/// flags, XMP, outlines, form fields, annotations, signature envelopes,
+/// page labels, embedded files, and encoded image XObjects.
+final class PdfParser implements DocumentParser, OptionAwareDocumentParser {
   const PdfParser();
 
   @override
   DocumentFormat get format => DocumentFormat.pdf;
+
+  String get parserVersion => parserImplementationVersion;
 
   @override
   bool canParse(Uint8List bytes) {
@@ -36,27 +41,56 @@ final class PdfParser implements DocumentParser {
   }
 
   @override
-  ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
+  ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) =>
+      parseWithOptions(bytes, hasher: hasher);
+
+  @override
+  ParseResult parseWithOptions(
+    Uint8List bytes, {
+    required ContentHasher hasher,
+    ParseOptions options = const ParseOptions(),
+    DocumentHints? hints,
+  }) {
+    final digest = hasher.digestFor(bytes);
     final PdfDocument doc;
     try {
-      doc = PdfDocument.parse(bytes);
+      doc = PdfDocument.parse(
+        bytes,
+        maxDecompressedEntryBytes: options.limits.maxDecompressedEntryBytes,
+      );
     } on ParseException {
       rethrow;
-    } catch (e) {
-      throw MalformedDocumentException('failed to parse PDF structure: $e');
+    } catch (_) {
+      throw const MalformedDocumentException('failed to parse PDF structure');
     }
 
     final warnings = <ParseWarning>[];
-    final pages = doc.pages();
+    if (options.rejectEncrypted && doc.isEncrypted) {
+      throw const UnsupportedFeatureException(
+        'encrypted PDF rejected by parse options',
+      );
+    }
+
+    var pages = doc.pages();
+    if (pages.length > options.limits.maxPages) {
+      warnings.add(
+        ParseWarning(
+          'pdf.page_limit',
+          'page count exceeded ${options.limits.maxPages}; later pages skipped',
+        ),
+      );
+      pages = pages.sublist(0, options.limits.maxPages);
+    }
+
     final pageTexts = <String>[];
     for (final page in pages) {
       try {
         pageTexts.add(ContentTextExtractor.extractPage(doc, page));
-      } catch (e) {
+      } catch (_) {
         warnings.add(
-          ParseWarning(
+          const ParseWarning(
             'pdf.page_extract_failed',
-            'a page could not be extracted: $e',
+            'a page could not be extracted',
           ),
         );
         pageTexts.add('');
@@ -74,15 +108,23 @@ final class PdfParser implements DocumentParser {
       );
     }
 
-    // PDF/A-3 (and PDF 2.0) can carry associated files — e.g. the hybrid
-    // invoice XML in ZUGFeRD/Factur-X. Surface them and fold any textual
-    // payload into the extracted content.
-    final embedded = _extractEmbeddedFiles(doc);
-    final text = embedded.text.isEmpty
+    final extraction = PdfMetadataExtractor(
+      doc,
+      hasher,
+      options,
+      fileLength: bytes.length,
+      pages: pages,
+    ).extract();
+    warnings.addAll(extraction.warnings);
+
+    final embeddedText = extraction.attachments
+        .map((a) => a.text?.trim() ?? '')
+        .where((t) => t.isNotEmpty)
+        .join('\n\f\n')
+        .trim();
+    final text = embeddedText.isEmpty
         ? pageText
-        : (pageText.isEmpty
-              ? embedded.text
-              : '$pageText\n\f\n${embedded.text}');
+        : (pageText.isEmpty ? embeddedText : '$pageText\n\f\n$embeddedText');
 
     final info = doc.info;
     String? infoString(String key) {
@@ -97,37 +139,133 @@ final class PdfParser implements DocumentParser {
     final permissions = permissionsValue is PdfNumber
         ? _permissionFlags(permissionsValue.value.toInt())
         : null;
-    final visualPages = PdfVisualExtractor.extract(doc, pages);
+    final visualPages = options.includeVisual
+        ? PdfVisualExtractor.extract(doc, pages)
+        : const <Map<String, Object?>>[];
+
+    final metadata = <String, Object?>{
+      'pdfVersion': doc.version,
+      'pageCount': pages.length,
+      if (visualPages.isNotEmpty) 'visualPages': visualPages,
+      ...extraction.metadata,
+    };
+    void putIfAbsent(String key, String infoKey) {
+      final v = infoString(infoKey);
+      if (v != null && v.isNotEmpty) metadata.putIfAbsent(key, () => v);
+    }
+
+    putIfAbsent('title', 'Title');
+    putIfAbsent('author', 'Author');
+    putIfAbsent('subject', 'Subject');
+    putIfAbsent('keywords', 'Keywords');
+    putIfAbsent('producer', 'Producer');
+    putIfAbsent('creator', 'Creator');
+    putIfAbsent('creationDate', 'CreationDate');
+    putIfAbsent('modDate', 'ModDate');
+    if (doc.encryptionLabel != null) {
+      metadata['encrypted'] = true;
+      metadata['encryption'] = doc.encryptionLabel;
+    }
+    if (permissions != null) metadata['permissions'] = permissions;
+
+    final embeddedFiles = [
+      for (final a in extraction.attachments)
+        if (a.path.length <= 1)
+          {
+            'name': ?a.name,
+            if (a.size != null) 'size': a.size,
+            if (a.relationship != null) 'relationship': a.relationship,
+            if (a.mediaType != null) 'mediaType': a.mediaType,
+          },
+    ];
+    if (embeddedFiles.isNotEmpty) {
+      metadata['embeddedFileCount'] = embeddedFiles.length;
+      metadata['embeddedFiles'] = embeddedFiles;
+    }
+    final hasAF = doc.resolve(doc.catalog?['AF']) is PdfArray;
+    if (hasAF) metadata['pdfA3'] = true;
 
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: format,
       byteLength: bytes.length,
-      metadata: {
-        'pdfVersion': doc.version,
-        'pageCount': pages.length,
-        if (visualPages.isNotEmpty) 'visualPages': visualPages,
-        if (infoString('Title') != null) 'title': infoString('Title'),
-        if (infoString('Author') != null) 'author': infoString('Author'),
-        if (infoString('Subject') != null) 'subject': infoString('Subject'),
-        if (infoString('Keywords') != null) 'keywords': infoString('Keywords'),
-        if (infoString('Producer') != null) 'producer': infoString('Producer'),
-        if (infoString('Creator') != null) 'creator': infoString('Creator'),
-        if (infoString('CreationDate') != null)
-          'creationDate': infoString('CreationDate'),
-        if (infoString('ModDate') != null) 'modDate': infoString('ModDate'),
-        if (doc.encryptionLabel != null) 'encrypted': true,
-        if (doc.encryptionLabel != null) 'encryption': doc.encryptionLabel,
-        'permissions': ?permissions,
-        if (embedded.files.isNotEmpty)
-          'embeddedFileCount': embedded.files.length,
-        if (embedded.files.isNotEmpty) 'embeddedFiles': embedded.files,
-        if (embedded.hasAssociatedFiles) 'pdfA3': true,
-      },
+      metadata: metadata,
       text: text.isEmpty ? null : text,
       warnings: warnings,
+      structuredText: options.includeStructuredText
+          ? _structuredText(doc, pages, visualPages, pageTexts, metadata)
+          : null,
+      outline: extraction.outline,
+      attachments: extraction.attachments,
+      signatures: extraction.signatures,
+      parserVersion: parserVersion,
     );
   }
+
+  /// Builds page-aware text from the visual display list when available, or
+  /// from the flat page text otherwise.
+  StructuredText _structuredText(
+    PdfDocument doc,
+    List<PdfDict> pages,
+    List<Map<String, Object?>> visualPages,
+    List<String> pageTexts,
+    Map<String, Object?> metadata,
+  ) {
+    final labels = metadata['pageLabels'];
+    final out = <TextPage>[];
+    for (var i = 0; i < pages.length; i++) {
+      final visual = i < visualPages.length ? visualPages[i] : null;
+      final width = visual?['width'];
+      final height = visual?['height'];
+      final blocks = <TextBlock>[];
+      final commands = visual?['commands'];
+      if (commands is List) {
+        for (final command in commands) {
+          if (command is! Map || command['type'] != 'text') continue;
+          final value = command['text'];
+          if (value is! String || value.trim().isEmpty) continue;
+          final x = _double(command['x']) ?? 0;
+          final y = _double(command['y']) ?? 0;
+          final size = _double(command['fontSize']) ?? 10;
+          blocks.add(
+            TextBlock(
+              spans: [TextSpan(value)],
+              bounds: TextBounds(
+                left: x,
+                top: y,
+                right: x + value.runes.length * size * 0.5,
+                bottom: y + size,
+              ),
+              style: 'text',
+            ),
+          );
+        }
+      }
+      if (blocks.isEmpty) {
+        final pageText = i < pageTexts.length ? pageTexts[i].trim() : '';
+        if (pageText.isNotEmpty) {
+          blocks.add(
+            TextBlock(spans: [TextSpan(pageText)], style: 'paragraph'),
+          );
+        }
+      }
+      out.add(
+        TextPage(
+          index: i,
+          width: _double(width),
+          height: _double(height),
+          blocks: blocks,
+          coordinateSpace: TextCoordinateSpace.pdfUserSpace,
+          label: labels is Map ? labels['$i'] as String? : null,
+        ),
+      );
+    }
+    return StructuredText(out);
+  }
+
+  static double? _double(Object? value) =>
+      value is num ? value.toDouble() : double.tryParse('$value');
 
   /// Decodes the Standard security handler permission bits (PDF 7.6.3.2).
   Map<String, bool> _permissionFlags(int p) => {
@@ -140,131 +278,4 @@ final class PdfParser implements DocumentParser {
     'assemble': p & (1 << 10) != 0,
     'printHighRes': p & (1 << 11) != 0,
   };
-
-  /// Collects embedded files from the catalog `/Names /EmbeddedFiles` name tree
-  /// and the `/AF` associated-files array, returning their metadata, any text
-  /// recovered from XML/JSON/text payloads, and whether associated files exist
-  /// (the PDF/A-3 signal).
-  ({List<Map<String, Object?>> files, String text, bool hasAssociatedFiles})
-  _extractEmbeddedFiles(PdfDocument doc) {
-    final cat = doc.catalog;
-    if (cat == null) {
-      return (files: const [], text: '', hasAssociatedFiles: false);
-    }
-
-    final filespecs = <PdfDict>[];
-    final seen = <PdfDict>{};
-    void addFilespec(PdfObject? fs) {
-      final d = doc.resolve(fs);
-      if (d is PdfDict && seen.add(d)) filespecs.add(d);
-    }
-
-    final names = doc.resolve(cat['Names']);
-    if (names is PdfDict) {
-      final ef = doc.resolve(names['EmbeddedFiles']);
-      if (ef is PdfDict) _walkNameTree(doc, ef, addFilespec, 0);
-    }
-
-    final afObj = doc.resolve(cat['AF']);
-    final hasAF = afObj is PdfArray && afObj.items.isNotEmpty;
-    if (afObj is PdfArray) {
-      for (final f in afObj.items) {
-        addFilespec(f);
-      }
-    }
-
-    final files = <Map<String, Object?>>[];
-    final textOut = StringBuffer();
-    for (final fs in filespecs) {
-      final name = _filespecName(doc, fs);
-      final relationship = doc.resolve(fs['AFRelationship']);
-      Uint8List? data;
-      final ef = doc.resolve(fs['EF']);
-      if (ef is PdfDict) {
-        final stream = doc.resolve(ef['F']) ?? doc.resolve(ef['UF']);
-        if (stream is PdfStream) {
-          try {
-            data = doc.decoded(stream);
-          } catch (_) {
-            data = null;
-          }
-        }
-      }
-      files.add({
-        'name': ?name,
-        if (data != null) 'size': data.length,
-        if (relationship is PdfName) 'relationship': relationship.name,
-      });
-      if (data != null && _looksTextual(name, data)) {
-        textOut.writeln(utf8.decode(data, allowMalformed: true).trim());
-      }
-    }
-
-    return (
-      files: files,
-      text: textOut.toString().trimRight(),
-      hasAssociatedFiles: hasAF,
-    );
-  }
-
-  void _walkNameTree(
-    PdfDocument doc,
-    PdfDict node,
-    void Function(PdfObject?) onValue,
-    int depth,
-  ) {
-    if (depth > 32) return;
-    final names = doc.resolve(node['Names']);
-    if (names is PdfArray) {
-      for (var i = 1; i < names.items.length; i += 2) {
-        onValue(names.items[i]); // [key value key value …]
-      }
-    }
-    final kids = doc.resolve(node['Kids']);
-    if (kids is PdfArray) {
-      for (final kid in kids.items) {
-        final k = doc.resolve(kid);
-        if (k is PdfDict) _walkNameTree(doc, k, onValue, depth + 1);
-      }
-    }
-  }
-
-  String? _filespecName(PdfDocument doc, PdfDict fs) {
-    for (final key in const ['UF', 'F']) {
-      final v = doc.resolve(fs[key]);
-      if (v is PdfString) {
-        final s = _pdfTextString(v.bytes).trim();
-        if (s.isNotEmpty) return s;
-      }
-    }
-    return null;
-  }
-
-  String _pdfTextString(Uint8List b) {
-    if (b.length >= 2 && b[0] == 0xFE && b[1] == 0xFF) {
-      final units = <int>[];
-      for (var i = 2; i + 1 < b.length; i += 2) {
-        units.add((b[i] << 8) | b[i + 1]); // UTF-16BE
-      }
-      return String.fromCharCodes(units);
-    }
-    return latin1.decode(b, allowInvalid: true);
-  }
-
-  bool _looksTextual(String? name, Uint8List data) {
-    final n = name?.toLowerCase() ?? '';
-    if (n.endsWith('.xml') ||
-        n.endsWith('.json') ||
-        n.endsWith('.txt') ||
-        n.endsWith('.csv') ||
-        n.endsWith('.html')) {
-      return true;
-    }
-    for (final b in data.take(64)) {
-      const skip = {0x20, 0x09, 0x0A, 0x0D, 0xEF, 0xBB, 0xBF};
-      if (skip.contains(b)) continue;
-      return b == 0x3C || b == 0x7B; // '<' or '{'
-    }
-    return false;
-  }
 }

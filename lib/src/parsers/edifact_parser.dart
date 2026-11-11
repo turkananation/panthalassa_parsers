@@ -16,6 +16,8 @@ import '../core/parse_result.dart';
 final class EdifactParser implements DocumentParser {
   const EdifactParser();
 
+  static const int _unaLength = 9;
+
   @override
   DocumentFormat get format => DocumentFormat.edifact;
 
@@ -29,22 +31,44 @@ final class EdifactParser implements DocumentParser {
 
   @override
   ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
-    final String source;
+    final digest = hasher.digestFor(bytes);
+
+    // EDIFACT may be UTF-8 or Latin-1. Detect a BOM / high-bit bytes and decode
+    // accordingly; never silently substitute replacement characters.
+    String source;
+    bool nonAscii = false;
     try {
-      // EDIFACT is commonly Latin-1; decode permissively but flag non-ASCII.
+      source = utf8.decode(bytes, allowMalformed: false);
+    } on FormatException {
+      // Latin-1 path: every byte maps to a code point; scan for non-ASCII.
       source = latin1.decode(bytes, allowInvalid: true);
-    } on FormatException catch (e) {
-      throw TextDecodingException('cannot decode EDIFACT: ${e.message}');
+      for (final b in bytes) {
+        if (b > 0x7F) nonAscii = true;
+      }
+    } catch (_) {
+      throw const TextDecodingException('cannot decode EDIFACT');
     }
 
     final delims = _Delimiters.fromSource(source);
-    final body = delims.unaConsumed ? source.substring(9) : source;
+    // `UNA` may be preceded by leading whitespace; locate it at the start of
+    // the (trimmed) stream rather than assuming offset zero.
+    final startOfBody = delims.unaConsumed ? _unaLength : 0;
+    final body = source.substring(startOfBody);
     final segments = _splitSegments(body, delims);
     if (segments.isEmpty) {
       throw const MalformedDocumentException('no EDIFACT segments found');
     }
 
     final warnings = <ParseWarning>[];
+    if (nonAscii) {
+      warnings.add(
+        const ParseWarning(
+          'edifact.non_ascii',
+          'non-ASCII bytes decoded as Latin-1; confirm the syntax encoding',
+        ),
+      );
+    }
+
     final unb = segments.firstWhere(
       (s) => s.tag == 'UNB',
       orElse: () => const _Segment('UNB', []),
@@ -68,7 +92,8 @@ final class EdifactParser implements DocumentParser {
         .toList();
 
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: format,
       byteLength: bytes.length,
       metadata: {
@@ -78,6 +103,8 @@ final class EdifactParser implements DocumentParser {
         'recipient': unb.at(2, 0),
         'interchangeRef': unb.at(4, 0),
         'messageTypes': messageTypes,
+        if (nonAscii) 'nonAscii': true,
+        if (delims.unaConsumed) 'serviceStringAdvice': true,
       },
       text: segments
           .map(
@@ -94,10 +121,6 @@ final class EdifactParser implements DocumentParser {
     for (final segText in _split(body, d.segment, d.release)) {
       final trimmed = segText.trim();
       if (trimmed.isEmpty) continue;
-      // Release sequences are preserved through the segment and element splits,
-      // then resolved once at the component (leaf) level — otherwise the escape
-      // would be consumed by the first pass and fail to protect inner
-      // separators (e.g. "ACME?+CO" must stay a single value "ACME+CO").
       final elements = _split(trimmed, d.element, d.release)
           .map(
             (e) => _split(
@@ -166,7 +189,11 @@ final class EdifactParser implements DocumentParser {
     final slice = bytes.length <= max
         ? bytes
         : Uint8List.sublistView(bytes, 0, max);
-    return latin1.decode(slice, allowInvalid: true);
+    try {
+      return latin1.decode(slice, allowInvalid: true);
+    } catch (_) {
+      return null;
+    }
   }
 }
 
@@ -188,14 +215,16 @@ class _Delimiters {
   final bool unaConsumed;
 
   factory _Delimiters.fromSource(String source) {
-    if (source.startsWith('UNA') && source.length >= 9) {
+    final trimmed = source.trimLeft();
+    final unaOffset = trimmed.indexOf('UNA');
+    if (unaOffset == 0 && trimmed.length >= EdifactParser._unaLength) {
       return _Delimiters(
-        component: source[3],
-        element: source[4],
-        decimal: source[5],
-        release: source[6],
-        // source[7] is reserved (space)
-        segment: source[8],
+        component: trimmed[3],
+        element: trimmed[4],
+        decimal: trimmed[5],
+        release: trimmed[6],
+        // trimmed[7] is reserved (space)
+        segment: trimmed[8],
         unaConsumed: true,
       );
     }

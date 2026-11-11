@@ -33,6 +33,7 @@ final class Hl7V2Parser implements DocumentParser {
 
   @override
   ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
+    final digest = hasher.digestFor(bytes);
     final source = utf8.decode(bytes, allowMalformed: true);
     final fieldSep = source[3];
     // MSH-2 encoding characters: component, repetition, escape, subcomponent.
@@ -83,7 +84,8 @@ final class Hl7V2Parser implements DocumentParser {
 
     final body = text.toString().trimRight();
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: format,
       byteLength: bytes.length,
       metadata: {

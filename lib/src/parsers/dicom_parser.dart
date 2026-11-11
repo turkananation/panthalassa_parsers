@@ -6,7 +6,12 @@ import '../core/content_hasher.dart';
 import '../core/document_format.dart';
 import '../core/document_parser.dart';
 import '../core/parse_exception.dart';
+import '../core/parse_options.dart';
 import '../core/parse_result.dart';
+import '../core/structured_artifacts.dart';
+import 'cda_parser.dart';
+import 'dicom_sr.dart';
+import 'pdf_parser.dart';
 
 /// Parser for DICOM Part 10 files (PS3.10).
 ///
@@ -14,7 +19,7 @@ import '../core/parse_result.dart';
 /// Information group as Explicit VR Little Endian, then walks the main dataset
 /// under the indicated transfer syntax. It descends into SQ values, including
 /// undefined-length item/delimitation records, and stops before Pixel Data.
-final class DicomParser implements DocumentParser {
+final class DicomParser implements DocumentParser, OptionAwareDocumentParser {
   const DicomParser();
 
   static const _preambleLength = 128;
@@ -82,6 +87,7 @@ final class DicomParser implements DocumentParser {
   /// list by numeric tag.
   static const _dictionary = <int, ({String key, String vr})>{
     0x00020010: (key: 'transferSyntaxUid', vr: 'UI'),
+    0x00080005: (key: 'specificCharacterSet', vr: 'CS'),
     0x00080008: (key: 'imageType', vr: 'CS'),
     0x00080016: (key: 'sopClassUid', vr: 'UI'),
     0x00080018: (key: 'sopInstanceUid', vr: 'UI'),
@@ -114,7 +120,30 @@ final class DicomParser implements DocumentParser {
     0x00280101: (key: 'bitsStored', vr: 'US'),
     0x00280102: (key: 'highBit', vr: 'US'),
     0x00280103: (key: 'pixelRepresentation', vr: 'US'),
+    0x00400010: (key: 'documentTitle', vr: 'ST'),
+    0x00400011: (key: 'encapsulatedDocument', vr: 'OB'),
+    0x00400012: (key: 'mimeTypeOfEncapsulatedDocument', vr: 'LO'),
+    0x0040A010: (key: 'relationshipType', vr: 'CS'),
+    0x0040A040: (key: 'valueType', vr: 'CS'),
+    0x0040A043: (key: 'conceptNameCodeSequence', vr: 'SQ'),
+    0x0040A120: (key: 'dateTime', vr: 'DT'),
+    0x0040A123: (key: 'personName', vr: 'PN'),
+    0x0040A124: (key: 'uid', vr: 'UI'),
+    0x0040A160: (key: 'textValue', vr: 'UT'),
+    0x0040A168: (key: 'conceptCodeSequence', vr: 'SQ'),
+    0x0040A30A: (key: 'numericValue', vr: 'DS'),
+    0x0040A375: (key: 'referencedInstanceSequence', vr: 'SQ'),
+    0x0040A504: (key: 'contentTemplateSequence', vr: 'SQ'),
+    0x0040A730: (key: 'contentSequence', vr: 'SQ'),
+    0x004008EA: (key: 'measurementUnitsCodeSequence', vr: 'SQ'),
+    0x00080100: (key: 'codeValue', vr: 'SH'),
+    0x00080102: (key: 'codingSchemeDesignator', vr: 'SH'),
+    0x00080104: (key: 'codeMeaning', vr: 'LO'),
   };
+
+  /// Public read-only view of the common-tag dictionary for sibling parsers
+  /// (DICOM JSON) and downstream rendering.
+  static const Map<int, ({String key, String vr})> tagDictionary = _dictionary;
 
   @override
   DocumentFormat get format => DocumentFormat.dicom;
@@ -129,7 +158,17 @@ final class DicomParser implements DocumentParser {
   }
 
   @override
-  ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
+  ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) =>
+      parseWithOptions(bytes, hasher: hasher);
+
+  @override
+  ParseResult parseWithOptions(
+    Uint8List bytes, {
+    required ContentHasher hasher,
+    ParseOptions options = const ParseOptions(),
+    DocumentHints? hints,
+  }) {
+    final digest = hasher.digestFor(bytes);
     final warnings = <ParseWarning>[];
     final reader = ByteReader(bytes, endian: Endian.little)
       ..seek(_preambleLength + 4);
@@ -186,8 +225,36 @@ final class DicomParser implements DocumentParser {
       depth: 0,
     );
 
+    // Honor SpecificCharacterSet (0008,0005): surface the declared repertoire
+    // so callers decode multi-valued strings correctly. Defaults to ISO_IR 6
+    // (ASCII) where the tag is absent. Parsers never silently substitute
+    // replacement characters for non-ASCII bytes.
+    final specificCharSet = dataset.metadata['specificCharacterSet'];
+    final charset = _firstString(specificCharSet);
+    dataset.metadata['characterSet'] = charset ?? 'ISO_IR 6';
+
+    final structuredReport = extractDicomStructuredReport(
+      dataset.attributes,
+      options,
+      warnings,
+    );
+    final attachments = _encapsulatedAttachments(
+      dataset,
+      hasher,
+      options,
+      warnings,
+    );
+    if (structuredReport != null) {
+      dataset.metadata['hasStructuredReport'] = true;
+      dataset.metadata['structuredReport'] = structuredReport.tree;
+    }
+    if (attachments.isNotEmpty) {
+      dataset.metadata['attachmentCount'] = attachments.length;
+    }
+
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: format,
       byteLength: bytes.length,
       metadata: {
@@ -202,9 +269,132 @@ final class DicomParser implements DocumentParser {
         ...dataset.metadata,
         'attributes': dataset.attributes,
       },
-      text: null,
+      text: structuredReport?.text,
       warnings: warnings,
+      structuredText: options.includeStructuredText && structuredReport != null
+          ? StructuredText([
+              TextPage(index: 0, blocks: structuredReport.blocks),
+            ])
+          : null,
+      outline: options.includeOutline
+          ? structuredReport?.outline ?? const []
+          : const [],
+      tables: options.includeTables
+          ? structuredReport?.tables ?? const []
+          : const [],
+      attachments: attachments,
+      parserVersion: parserImplementationVersion,
     );
+  }
+
+  // --- encapsulated documents ----------------------------------------------
+
+  List<DocumentAttachment> _encapsulatedAttachments(
+    _DatasetParse dataset,
+    ContentHasher hasher,
+    ParseOptions options,
+    List<ParseWarning> warnings,
+  ) {
+    final bytes = dataset.encapsulatedDocument;
+    if (bytes == null || !options.includeAttachments) return const [];
+    if (bytes.length > options.limits.maxAttachmentBytes) {
+      warnings.add(
+        ParseWarning(
+          'dicom.encapsulated_document_limit',
+          'encapsulated document exceeded '
+              '${options.limits.maxAttachmentBytes} bytes',
+        ),
+      );
+      return const [];
+    }
+    final declaredMime = _firstString(
+      dataset.metadata['mimeTypeOfEncapsulatedDocument'],
+    );
+    final mime = declaredMime ?? _sniffMime(bytes);
+    final title = _firstString(dataset.metadata['documentTitle']);
+    ParseResult? child;
+    String? extractedText;
+    if (options.parseAttachments) {
+      try {
+        if (mime == 'application/pdf' || _startsWith(bytes, '%PDF')) {
+          child = const PdfParser().parseWithOptions(
+            bytes,
+            hasher: hasher,
+            options: options,
+          );
+        } else if (mime.contains('xml') || _looksLikeXml(bytes)) {
+          child = const CdaParser().parseWithOptions(
+            bytes,
+            hasher: hasher,
+            options: options,
+          );
+        }
+      } on ParseException catch (error) {
+        warnings.add(
+          ParseWarning(
+            'dicom.encapsulated_document_parse_failed',
+            'encapsulated document could not be parsed: ${error.message}',
+          ),
+        );
+      }
+    }
+    if (child != null) {
+      extractedText = child.text;
+    } else if (mime.startsWith('text/') || mime.contains('xml')) {
+      extractedText = latin1.decode(bytes, allowInvalid: true);
+      if (extractedText.length > options.limits.maxTextCharacters) {
+        extractedText = extractedText.substring(
+          0,
+          options.limits.maxTextCharacters,
+        );
+      }
+    }
+
+    return [
+      DocumentAttachment(
+        name: title ?? 'encapsulated-document',
+        mediaType: mime,
+        size: bytes.length,
+        digest: hasher.digestFor(bytes),
+        bytes: options.includeAttachmentBytes ? bytes : null,
+        text: extractedText,
+        child: child,
+        relationship: 'encapsulatedDocument',
+      ),
+    ];
+  }
+
+  static String _sniffMime(Uint8List bytes) {
+    if (_startsWith(bytes, '%PDF')) return 'application/pdf';
+    if (_looksLikeXml(bytes)) return 'application/xml';
+    return 'application/octet-stream';
+  }
+
+  static bool _startsWith(Uint8List bytes, String prefix) {
+    if (bytes.length < prefix.length) return false;
+    for (var i = 0; i < prefix.length; i++) {
+      if (bytes[i] != prefix.codeUnitAt(i)) return false;
+    }
+    return true;
+  }
+
+  static bool _looksLikeXml(Uint8List bytes) {
+    var i = 0;
+    while (i < bytes.length && i < 64) {
+      final c = bytes[i];
+      if (c == 0x20 ||
+          c == 0x09 ||
+          c == 0x0A ||
+          c == 0x0D ||
+          c == 0xEF ||
+          c == 0xBB ||
+          c == 0xBF) {
+        i++;
+        continue;
+      }
+      return c == 0x3C; // '<'
+    }
+    return false;
   }
 
   _DatasetParse _readDataset(
@@ -220,6 +410,7 @@ final class DicomParser implements DocumentParser {
     final attributes = <Map<String, Object?>>[];
     var count = 0;
     var hasPixelData = false;
+    Uint8List? encapsulatedDocument;
     if (depth > 12) {
       warnings.add(
         ParseWarning(
@@ -233,6 +424,7 @@ final class DicomParser implements DocumentParser {
         attributes: attributes,
         elementCount: count,
         hasPixelData: hasPixelData,
+        encapsulatedDocument: encapsulatedDocument,
       );
     }
 
@@ -262,6 +454,9 @@ final class DicomParser implements DocumentParser {
             ? _readExplicitElement(r, tag, warnings, depth)
             : _readImplicitElement(r, tag, warnings, depth);
         count++;
+        if (tag == 0x00400011 && value.bytes != null) {
+          encapsulatedDocument = value.bytes;
+        }
         final dict = _dictionary[tag];
         final rendered = _present(value);
         if (dict != null && !metadata.containsKey(dict.key)) {
@@ -285,6 +480,7 @@ final class DicomParser implements DocumentParser {
       attributes: attributes,
       elementCount: count,
       hasPixelData: hasPixelData,
+      encapsulatedDocument: encapsulatedDocument,
     );
   }
 
@@ -440,10 +636,7 @@ final class DicomParser implements DocumentParser {
     if (v.sequenceItems != null) return v.sequenceItems;
     if (v.bytes == null) return null;
     if (_stringVrs.contains(v.vr)) {
-      final decoded = ascii
-          .decode(v.bytes!, allowInvalid: true)
-          .replaceAll('\x00', '')
-          .trim();
+      final decoded = _decodeStringValue(v.bytes!);
       if (decoded.contains(r'\')) {
         final parts = decoded
             .split(r'\')
@@ -467,9 +660,28 @@ final class DicomParser implements DocumentParser {
     return '<${v.length} bytes>';
   }
 
-  String _tagHex(int tag) =>
-      '(${(tag >> 16).toRadixString(16).padLeft(4, '0').toUpperCase()},'
-      '${(tag & 0xFFFF).toRadixString(16).padLeft(4, '0').toUpperCase()})';
+  /// Decodes a string-valued element under the DICOM default repertoire
+  /// (ISO_IR 6 / UTF-8 compatible). Non-ASCII bytes are preserved verbatim
+  /// rather than replaced, so callers can apply SpecificCharacterSet themselves.
+  static String _decodeStringValue(Uint8List bytes) {
+    return latin1
+        .decode(bytes, allowInvalid: true)
+        .replaceAll('\x00', '')
+        .trim();
+  }
+
+  static String? _firstString(Object? value) {
+    if (value == null) return null;
+    if (value is String) return value.trim();
+    if (value is List) {
+      for (final e in value) {
+        if (e is String) return e.trim();
+      }
+    }
+    return null;
+  }
+
+  String _tagHex(int tag) => dicomTagHex(tag);
 }
 
 final class _DatasetParse {
@@ -478,12 +690,14 @@ final class _DatasetParse {
     required this.attributes,
     required this.elementCount,
     required this.hasPixelData,
+    this.encapsulatedDocument,
   });
 
   final Map<String, Object?> metadata;
   final List<Map<String, Object?>> attributes;
   final int elementCount;
   final bool hasPixelData;
+  final Uint8List? encapsulatedDocument;
 }
 
 final class _ElementValue {

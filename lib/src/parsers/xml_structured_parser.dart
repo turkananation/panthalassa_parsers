@@ -27,20 +27,26 @@ final class XmlStructuredParser implements DocumentParser {
 
   @override
   ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
+    final digest = hasher.digestFor(bytes);
     final doc = XmlSupport.parse(bytes);
     final root = doc.rootElement;
     final prefix = XmlSupport.peek(bytes, 8192) ?? '';
     final isNiem = XmlSupport.niemHint.hasMatch(prefix);
     final namespace = root.getAttribute('xmlns');
+    final rootAttrs = <String>{
+      for (final a in root.attributes) '${a.name.prefix ?? ''}:${a.name.local}',
+    };
 
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: isNiem ? DocumentFormat.niem : DocumentFormat.xml,
       byteLength: bytes.length,
       metadata: {
         if (isNiem) 'profile': 'NIEM XML',
-        'rootElement': root.localName,
+        'rootElement': root.name.local,
         'namespace': ?namespace,
+        'rootAttributes': rootAttrs.toList(),
         'elementCount': root.descendantElements.length + 1,
       },
       text: _orNull(XmlSupport.extractText(root)),

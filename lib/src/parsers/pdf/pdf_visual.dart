@@ -38,11 +38,11 @@ class PdfVisualExtractor {
         _VisualState(),
         0,
       );
-    } catch (e) {
+    } catch (_) {
       commands.add({
         'type': 'unsupported',
         'operator': 'pdf.visual_extract_failed',
-        'detail': '$e',
+        'detail': 'visual extraction failed',
       });
     }
     return {

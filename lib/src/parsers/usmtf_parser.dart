@@ -56,6 +56,7 @@ final class UsmtfParser implements DocumentParser {
 
   @override
   ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
+    final digest = hasher.digestFor(bytes);
     final String source;
     try {
       source = ascii.decode(bytes, allowInvalid: true);
@@ -90,7 +91,8 @@ final class UsmtfParser implements DocumentParser {
     }
 
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: format,
       byteLength: bytes.length,
       metadata: {

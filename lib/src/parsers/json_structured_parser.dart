@@ -30,6 +30,7 @@ final class JsonStructuredParser implements DocumentParser {
 
   @override
   ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
+    final digest = hasher.digestFor(bytes);
     final List<Object?> records;
     final bool ndjson;
     try {
@@ -40,6 +41,7 @@ final class JsonStructuredParser implements DocumentParser {
 
     final isNiem = _detectNiem(bytes, records);
     final text = StringBuffer();
+    var textTruncated = false;
     final topKeys = <String>{};
     for (final record in records) {
       if (record is Map) {
@@ -47,12 +49,13 @@ final class JsonStructuredParser implements DocumentParser {
           if (k is String) topKeys.add(k);
         }
       }
-      JsonSupport.collectText(record, text);
+      textTruncated = JsonSupport.collectText(record, text) || textTruncated;
     }
     final body = text.toString().trimRight();
 
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: isNiem ? DocumentFormat.niem : DocumentFormat.json,
       byteLength: bytes.length,
       metadata: {
@@ -66,7 +69,13 @@ final class JsonStructuredParser implements DocumentParser {
         if (ndjson) 'recordCount': records.length,
       },
       text: body.isEmpty ? null : body,
-      warnings: const [],
+      warnings: [
+        if (textTruncated)
+          const ParseWarning(
+            'json.text_truncated',
+            'JSON text harvest hit the node/character limit',
+          ),
+      ],
     );
   }
 

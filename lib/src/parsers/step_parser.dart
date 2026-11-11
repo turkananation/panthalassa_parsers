@@ -31,6 +31,7 @@ final class StepParser implements DocumentParser {
 
   @override
   ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
+    final digest = hasher.digestFor(bytes);
     final String source;
     try {
       source = latin1.decode(bytes, allowInvalid: true);
@@ -100,7 +101,8 @@ final class StepParser implements DocumentParser {
             .toList();
 
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: format,
       byteLength: bytes.length,
       metadata: {

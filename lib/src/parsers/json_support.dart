@@ -4,14 +4,17 @@ import 'dart:typed_data';
 /// Shared helpers for JSON-family parsers: tolerant JSON / NDJSON decoding,
 /// text harvesting from arbitrary JSON trees, JWT decoding, and cheap sniffing.
 class JsonSupport {
+  /// Hard ceiling on NDJSON records retained from one stream.
+  static const int maxNdjsonRecords = 200000;
+
   /// Decodes UTF-8 JSON, or newline-delimited JSON (NDJSON), into a list of
   /// top-level records, plus whether NDJSON was detected. Throws
-  /// [FormatException] if nothing parses.
+  /// [FormatException] if nothing parses or nesting exceeds a safe depth.
   static (List<Object?>, bool) decode(Uint8List bytes) {
     final source = utf8.decode(bytes, allowMalformed: false);
     final trimmed = source.trim();
     try {
-      return ([jsonDecode(trimmed)], false);
+      return ([_decodeValue(trimmed)], false);
     } on FormatException {
       // Not a single JSON value — try NDJSON below.
     }
@@ -19,36 +22,74 @@ class JsonSupport {
     for (final line in const LineSplitter().convert(source)) {
       final t = line.trim();
       if (t.isEmpty) continue;
-      records.add(jsonDecode(t)); // throws if a line is not JSON
+      records.add(_decodeValue(t)); // throws if a line is not JSON
+      if (records.length > maxNdjsonRecords) {
+        throw const FormatException('NDJSON record count exceeds the limit');
+      }
     }
     if (records.isEmpty) throw const FormatException('empty JSON document');
     return (records, true);
   }
 
+  static Object? _decodeValue(String source) {
+    try {
+      return jsonDecode(source);
+    } on StackOverflowError {
+      // Dart's recursive decoder can exhaust the stack on deeply nested input.
+      throw const FormatException('JSON nesting is too deep');
+    }
+  }
+
   /// Appends every non-empty string scalar reachable in [node] to [out], one
   /// per line, in document order. Numbers/bools are skipped (usually flags or
-  /// identifiers, not human text). Bounded to avoid pathological inputs.
-  static void collectText(
+  /// identifiers, not human text).
+  ///
+  /// Traversal is iterative, so hostile nesting cannot overflow the call stack.
+  /// Returns `true` when a node or character budget truncated the harvest.
+  static bool collectText(
     Object? node,
     StringBuffer out, {
     int maxNodes = 200000,
+    int maxCharacters = 16 * 1024 * 1024,
   }) {
     var budget = maxNodes;
-    void walk(Object? n) {
-      if (budget-- <= 0) return;
+    var truncated = false;
+    final stack = <Object?>[node];
+    while (stack.isNotEmpty) {
+      if (budget-- <= 0 || out.length >= maxCharacters) {
+        truncated = true;
+        break;
+      }
+      final n = stack.removeLast();
       if (n is String) {
         final t = n.trim();
-        if (t.isNotEmpty) out.writeln(t);
+        if (t.isEmpty) continue;
+        final remaining = maxCharacters - out.length;
+        if (remaining <= 0) {
+          truncated = true;
+          break;
+        }
+        if (t.length + 1 <= remaining) {
+          out
+            ..write(t)
+            ..write('\n');
+        } else {
+          out.write(t.substring(0, remaining));
+          truncated = true;
+          break;
+        }
       } else if (n is List) {
-        for (final e in n) {
-          walk(e);
+        for (var i = n.length - 1; i >= 0; i--) {
+          stack.add(n[i]);
         }
       } else if (n is Map) {
-        n.forEach((_, v) => walk(v));
+        final values = n.values.toList(growable: false);
+        for (var i = values.length - 1; i >= 0; i--) {
+          stack.add(values[i]);
+        }
       }
     }
-
-    walk(node);
+    return truncated;
   }
 
   /// A small UTF-8 prefix for cheap detection, or `null` if not decodable.

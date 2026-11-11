@@ -58,11 +58,13 @@ final class StanagParser implements DocumentParser {
 
   @override
   ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
+    final digest = hasher.digestFor(bytes);
     for (final sub in _subParsers) {
       if (sub.matches(bytes)) {
         final parsed = sub.parse(bytes);
         return ParseResult(
-          documentId: hasher.idFor(bytes),
+          documentId: digest.sha256,
+          digest: digest,
           format: format,
           byteLength: bytes.length,
           metadata: {'standard': sub.standard, ...parsed.metadata},

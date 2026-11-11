@@ -43,6 +43,7 @@ final class NitfParser implements DocumentParser {
 
   @override
   ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
+    final digest = hasher.digestFor(bytes);
     if (bytes.length < _minHeader) {
       throw TruncatedDocumentException(
         'NITF header requires $_minHeader bytes, found ${bytes.length}',
@@ -165,7 +166,8 @@ final class NitfParser implements DocumentParser {
     ].join('\n');
 
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: format,
       byteLength: bytes.length,
       metadata: {

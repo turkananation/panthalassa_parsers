@@ -55,6 +55,7 @@ final class VerifiableCredentialParser implements DocumentParser {
   }
 
   ParseResult _parseJsonLd(Uint8List bytes, ContentHasher hasher) {
+    final digest = hasher.digestFor(bytes);
     final List<Object?> records;
     try {
       (records, _) = JsonSupport.decode(bytes);
@@ -67,11 +68,12 @@ final class VerifiableCredentialParser implements DocumentParser {
     }
 
     final text = StringBuffer();
-    JsonSupport.collectText(cred, text);
+    final truncated = JsonSupport.collectText(cred, text);
     final body = text.toString().trimRight();
 
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: format,
       byteLength: bytes.length,
       metadata: {
@@ -83,11 +85,18 @@ final class VerifiableCredentialParser implements DocumentParser {
         'hasProof': cred.containsKey('proof'),
       },
       text: body.isEmpty ? null : body,
-      warnings: const [],
+      warnings: [
+        if (truncated)
+          const ParseWarning(
+            'json.text_truncated',
+            'JSON text harvest hit the node/character limit',
+          ),
+      ],
     );
   }
 
   ParseResult _parseJwt(Uint8List bytes, String token, ContentHasher hasher) {
+    final digest = hasher.digestFor(bytes);
     final parts = token.split('.');
     final header = JsonSupport.decodeJwtSegment(parts[0]);
     final payload = JsonSupport.decodeJwtSegment(parts[1]);
@@ -98,12 +107,13 @@ final class VerifiableCredentialParser implements DocumentParser {
     }
 
     final text = StringBuffer();
-    JsonSupport.collectText(payload, text);
+    final truncated = JsonSupport.collectText(payload, text);
     final body = text.toString().trimRight();
 
     final vc = payload['vc'] ?? payload['vp'];
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: format,
       byteLength: bytes.length,
       metadata: {
@@ -115,7 +125,13 @@ final class VerifiableCredentialParser implements DocumentParser {
         'signed': parts.length == 3 && parts[2].isNotEmpty,
       },
       text: body.isEmpty ? null : body,
-      warnings: const [],
+      warnings: [
+        if (truncated)
+          const ParseWarning(
+            'json.text_truncated',
+            'JSON text harvest hit the node/character limit',
+          ),
+      ],
     );
   }
 
