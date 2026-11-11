@@ -31,7 +31,7 @@ final class ImageViewBuilder implements ViewBuilder {
   @override
   ViewerDocument build(ViewerRequest request) {
     final result = request.result;
-    final title = request.options.title ?? viewerBasename(request.filename);
+    final title = viewerTitle(request);
     final family =
         viewerString(result.metadata['formatFamily']) ?? result.format.label;
     final mediaType = viewerString(result.metadata['mediaType']);
@@ -39,13 +39,7 @@ final class ImageViewBuilder implements ViewBuilder {
     final height = viewerInt(result.metadata['height']);
     final sections = <ViewerSection>[];
     final assets = <String, ViewerAsset>{};
-    final notices = <ViewerNotice>[
-      for (final warning in result.warnings.take(8))
-        ViewerNotice(
-          '${warning.code}: ${warning.message}',
-          level: ViewerNoticeLevel.warning,
-        ),
-    ];
+    final notices = viewerWarnings(result);
 
     final previewType =
         mediaType != null && _previewMimeTypes.contains(mediaType)
@@ -130,11 +124,10 @@ final class ImageViewBuilder implements ViewBuilder {
       formatLabel: family,
       subtitle: [?dimensions, family].join(' · '),
       facts: {
+        ...viewerBaseFacts(request),
         'Format': family,
         'Media type': ?mediaType,
         'Dimensions': ?dimensions,
-        'Size': formatViewerBytes(request.bytes.length),
-        'Document ID': result.documentId,
       },
       sections: sections,
       assets: assets,

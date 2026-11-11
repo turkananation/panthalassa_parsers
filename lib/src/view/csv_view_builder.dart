@@ -20,17 +20,11 @@ final class CsvViewBuilder implements ViewBuilder {
   ViewerDocument build(ViewerRequest request) {
     final result = request.result;
     final options = request.options;
+    final title = viewerTitle(request);
+    final notices = viewerWarnings(result);
     final table = result.tables.isEmpty ? null : result.tables.first;
     final tabSeparated = result.metadata['isTabSeparated'] == true;
     final format = tabSeparated ? 'TSV' : 'CSV';
-    final title = options.title ?? viewerBasename(request.filename);
-    final notices = <ViewerNotice>[
-      for (final warning in result.warnings.take(8))
-        ViewerNotice(
-          '${warning.code}: ${warning.message}',
-          level: ViewerNoticeLevel.warning,
-        ),
-    ];
 
     if (table == null) {
       notices.add(
@@ -44,7 +38,13 @@ final class CsvViewBuilder implements ViewBuilder {
         title: title,
         formatLabel: format,
         subtitle: 'Text fallback',
-        facts: _facts(request, format, 0, 0),
+        facts: {
+          ...viewerBaseFacts(request),
+          'Format': format,
+          'Rows': '0',
+          'Columns': '0',
+          'Delimiter': result.metadata['isTabSeparated'] == true ? 'tab' : ',',
+        },
         sections: [
           ViewerTextSection(
             title: 'Extracted text',
@@ -60,7 +60,6 @@ final class CsvViewBuilder implements ViewBuilder {
     final section = viewerTableSection(table, options, fallbackTitle: 'Data');
     final dataRowCount = section.totalRowCount ?? 0;
     final columnCount = section.columns.length;
-    final facts = _facts(request, format, dataRowCount, columnCount);
 
     return ViewerDocument(
       title: title,
@@ -69,27 +68,16 @@ final class CsvViewBuilder implements ViewBuilder {
           '$format table · $dataRowCount '
           'row${dataRowCount == 1 ? '' : 's'} × $columnCount '
           'column${columnCount == 1 ? '' : 's'}',
-      facts: facts,
+      facts: {
+        ...viewerBaseFacts(request),
+        'Format': format,
+        'Rows': '$dataRowCount',
+        'Columns': '$columnCount',
+        'Delimiter': result.metadata['isTabSeparated'] == true ? 'tab' : ',',
+      },
       sections: [section],
       notices: notices,
       footer: 'Panthalassa CSV/TSV viewer',
     );
-  }
-
-  Map<String, String> _facts(
-    ViewerRequest request,
-    String format,
-    int rowCount,
-    int columnCount,
-  ) {
-    final result = request.result;
-    return {
-      'Format': format,
-      'Rows': '$rowCount',
-      'Columns': '$columnCount',
-      'Delimiter': result.metadata['isTabSeparated'] == true ? 'tab' : ',',
-      'Size': formatViewerBytes(request.bytes.length),
-      'Document ID': result.documentId,
-    };
   }
 }

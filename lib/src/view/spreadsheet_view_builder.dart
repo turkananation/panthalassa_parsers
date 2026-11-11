@@ -24,7 +24,7 @@ final class SpreadsheetViewBuilder implements ViewBuilder {
   @override
   ViewerDocument build(ViewerRequest request) {
     final result = request.result;
-    final title = request.options.title ?? viewerBasename(request.filename);
+    final title = viewerTitle(request);
     final formatLabel = result.format == DocumentFormat.odf
         ? 'ODS spreadsheet'
         : result.format.label;
@@ -48,20 +48,13 @@ final class SpreadsheetViewBuilder implements ViewBuilder {
           'sheet${sections.length == 1 ? '' : 's'} · $rowCount data '
           'row${rowCount == 1 ? '' : 's'}',
       facts: {
+        ...viewerBaseFacts(request),
         'Format': formatLabel,
         'Sheets': '${sections.length}',
         'Rows': '$rowCount',
-        'Size': formatViewerBytes(request.bytes.length),
-        'Document ID': result.documentId,
       },
       sections: sections,
-      notices: [
-        for (final warning in result.warnings.take(8))
-          ViewerNotice(
-            '${warning.code}: ${warning.message}',
-            level: ViewerNoticeLevel.warning,
-          ),
-      ],
+      notices: viewerWarnings(result),
       footer: 'Panthalassa spreadsheet viewer',
     );
   }

@@ -20,7 +20,7 @@ final class EmailViewBuilder implements ViewBuilder {
   @override
   ViewerDocument build(ViewerRequest request) {
     final result = request.result;
-    final title = request.options.title ?? viewerBasename(request.filename);
+    final title = viewerTitle(request);
     final subject = viewerString(result.metadata['subject']);
     final from = viewerString(result.metadata['from']);
     final to = viewerString(result.metadata['to']);
@@ -28,13 +28,7 @@ final class EmailViewBuilder implements ViewBuilder {
     final date = viewerString(result.metadata['date']);
     final messageId = viewerString(result.metadata['messageId']);
     final sections = <ViewerSection>[];
-    final notices = <ViewerNotice>[
-      for (final warning in result.warnings.take(8))
-        ViewerNotice(
-          '${warning.code}: ${warning.message}',
-          level: ViewerNoticeLevel.warning,
-        ),
-    ];
+    final notices = viewerWarnings(result);
 
     final body = result.text?.trim();
     if (body != null && body.isNotEmpty) {
@@ -74,6 +68,7 @@ final class EmailViewBuilder implements ViewBuilder {
       formatLabel: result.format.label,
       subtitle: subject ?? result.format.label,
       facts: {
+        ...viewerBaseFacts(request),
         'From': ?from,
         'To': ?to,
         'Cc': ?cc,
@@ -82,8 +77,6 @@ final class EmailViewBuilder implements ViewBuilder {
         'Message ID': ?messageId,
         if (result.attachments.isNotEmpty)
           'Attachments': '${result.attachments.length}',
-        'Size': formatViewerBytes(request.bytes.length),
-        'Document ID': result.documentId,
       },
       sections: sections,
       notices: notices,

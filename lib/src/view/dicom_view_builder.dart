@@ -29,7 +29,7 @@ final class DicomViewBuilder implements ViewBuilder {
   ViewerDocument build(ViewerRequest request) {
     final result = request.result;
     final options = request.options;
-    final title = options.title ?? viewerBasename(request.filename);
+    final title = viewerTitle(request);
     final notices = <ViewerNotice>[
       for (final warning
           in result.warnings
@@ -288,9 +288,7 @@ final class DicomViewBuilder implements ViewBuilder {
         metadata['transferSyntaxName'] ?? metadata['transferSyntax'],
       );
     }
-    add('Size', formatViewerBytes(request.bytes.length));
-    add('Document ID', result.documentId);
-    return facts;
+    return {...viewerBaseFacts(request), ...facts};
   }
 
   String _personName(String value) {

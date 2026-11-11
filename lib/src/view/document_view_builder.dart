@@ -25,28 +25,21 @@ final class DocumentViewBuilder implements ViewBuilder {
       ir,
       options: const RenderOptions(),
     );
-    final notices = <ViewerNotice>[
-      for (final warning in result.warnings.take(8))
-        ViewerNotice(
-          '${warning.code}: ${warning.message}',
-          level: ViewerNoticeLevel.warning,
-        ),
-    ];
-    final facts = <String, String>{
-      'Format': result.format.label,
-      if (ir.body.isNotEmpty) 'Sections': '${ir.body.length}',
-      if (result.tables.isNotEmpty) 'Tables': '${result.tables.length}',
-      if (result.outline.isNotEmpty) 'Outline': '${result.outline.length}',
-      if (result.attachments.isNotEmpty)
-        'Attachments': '${result.attachments.length}',
-      'Size': formatViewerBytes(request.bytes.length),
-      'Document ID': result.documentId,
-    };
+    final notices = viewerWarnings(result);
+
     return ViewerDocument(
-      title: request.options.title ?? viewerBasename(request.filename),
+      title: viewerTitle(request),
       formatLabel: result.format.label,
       subtitle: result.format.category.name,
-      facts: facts,
+      facts: {
+        ...viewerBaseFacts(request),
+        'Format': result.format.label,
+        if (ir.body.isNotEmpty) 'Sections': '${ir.body.length}',
+        if (result.tables.isNotEmpty) 'Tables': '${result.tables.length}',
+        if (result.outline.isNotEmpty) 'Outline': '${result.outline.length}',
+        if (result.attachments.isNotEmpty)
+          'Attachments': '${result.attachments.length}',
+      },
       sections: [ViewerHtmlSection(html: html)],
       notices: notices,
       footer: 'Panthalassa document viewer',

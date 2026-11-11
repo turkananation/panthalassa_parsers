@@ -29,14 +29,8 @@ final class StructuredSourceViewBuilder implements ViewBuilder {
   @override
   ViewerDocument build(ViewerRequest request) {
     final result = request.result;
-    final title = request.options.title ?? viewerBasename(request.filename);
-    final notices = <ViewerNotice>[
-      for (final warning in result.warnings.take(8))
-        ViewerNotice(
-          '${warning.code}: ${warning.message}',
-          level: ViewerNoticeLevel.warning,
-        ),
-    ];
+    final title = viewerTitle(request);
+    final notices = viewerWarnings(result);
     var source = _prettySource(result, request.bytes);
     if (source.isEmpty) {
       source = result.text ?? 'No source text could be decoded.';
@@ -56,21 +50,19 @@ final class StructuredSourceViewBuilder implements ViewBuilder {
     final keys = viewerValue(result.metadata['topLevelKeys']);
     final elementCount = viewerInt(result.metadata['elementCount']);
     final recordCount = viewerInt(result.metadata['recordCount']);
-    final facts = <String, String>{
-      'Format': result.format.label,
-      'Root element': ?root,
-      'Root type': ?rootType,
-      if (keys.isNotEmpty) 'Top-level keys': keys,
-      if (elementCount != null) 'Elements': '$elementCount',
-      if (recordCount != null) 'Records': '$recordCount',
-      'Size': formatViewerBytes(request.bytes.length),
-      'Document ID': result.documentId,
-    };
     return ViewerDocument(
       title: title,
       formatLabel: result.format.label,
       subtitle: [?rootType ?? root, result.format.label].join(' · '),
-      facts: facts,
+      facts: {
+        ...viewerBaseFacts(request),
+        'Format': result.format.label,
+        'Root element': ?root,
+        'Root type': ?rootType,
+        if (keys.isNotEmpty) 'Top-level keys': keys,
+        if (elementCount != null) 'Elements': '$elementCount',
+        if (recordCount != null) 'Records': '$recordCount',
+      },
       sections: [
         ViewerTextSection(
           title: 'Formatted source',
