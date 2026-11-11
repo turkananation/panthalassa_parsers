@@ -25,6 +25,7 @@ final class FhirJsonParser implements DocumentParser {
 
   @override
   ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
+    final digest = hasher.digestFor(bytes);
     final List<Object?> records;
     final bool ndjson;
     try {
@@ -38,6 +39,7 @@ final class FhirJsonParser implements DocumentParser {
     String? firstId;
     String? firstProfile;
     final text = StringBuffer();
+    var textTruncated = false;
 
     for (final record in records) {
       if (record is! Map) {
@@ -57,10 +59,18 @@ final class FhirJsonParser implements DocumentParser {
       }
       final entries = record['entry'];
       if (entries is List) entryCount += entries.length;
-      JsonSupport.collectText(record, text);
+      textTruncated = JsonSupport.collectText(record, text) || textTruncated;
     }
 
     final warnings = <ParseWarning>[];
+    if (textTruncated) {
+      warnings.add(
+        const ParseWarning(
+          'json.text_truncated',
+          'JSON text harvest hit the node/character limit',
+        ),
+      );
+    }
     if (resourceTypes.isEmpty) {
       warnings.add(
         const ParseWarning(
@@ -72,7 +82,8 @@ final class FhirJsonParser implements DocumentParser {
 
     final body = text.toString().trimRight();
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: format,
       byteLength: bytes.length,
       metadata: {

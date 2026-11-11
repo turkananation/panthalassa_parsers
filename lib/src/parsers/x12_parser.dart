@@ -34,6 +34,7 @@ final class X12Parser implements DocumentParser {
 
   @override
   ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
+    final digest = hasher.digestFor(bytes);
     final source = utf8.decode(bytes, allowMalformed: true);
     if (source.length < _isaLength) {
       throw const MalformedDocumentException('X12 ISA header is truncated');
@@ -78,7 +79,8 @@ final class X12Parser implements DocumentParser {
 
     final body = text.toString().trimRight();
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: format,
       byteLength: bytes.length,
       metadata: {

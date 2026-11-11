@@ -11,26 +11,42 @@
 /// final result = await registry.parseInIsolate(bytes);
 /// print('${result.format.label}: ${result.documentId}');
 /// ```
+///
+/// A companion CLI, `panthalassa`, ships in `bin/` for detection, parsing,
+/// rendering, batch ingestion, and content addressing. It is kept outside
+/// `lib/` so this library remains free of `dart:io` and web-safe.
 library;
 
-export 'src/core/content_hasher.dart' show ContentHasher, PqBytesContentHasher;
+export 'src/core/content_hasher.dart'
+    show ContentDigest, ContentHasher, PqBytesContentHasher;
 export 'src/core/document_capability.dart';
 export 'src/core/document_format.dart';
 export 'src/core/document_parser.dart';
 export 'src/core/parse_exception.dart';
+export 'src/core/parse_options.dart';
 export 'src/core/parse_result.dart';
 export 'src/core/parser_registry.dart';
 export 'src/core/format_detector.dart';
 export 'src/core/byte_reader.dart';
+export 'src/core/structured_artifacts.dart';
 
 export 'src/parsers/cda_parser.dart';
+export 'src/parsers/csv_parser.dart';
+export 'src/parsers/dicom_json_parser.dart';
 export 'src/parsers/dicom_parser.dart';
+export 'src/parsers/dicom_sr.dart';
 export 'src/parsers/edifact_parser.dart';
+export 'src/parsers/eml_parser.dart';
+export 'src/parsers/epub_parser.dart';
+export 'src/parsers/html_parser.dart';
+export 'src/parsers/image_metadata_parser.dart';
+export 'src/parsers/markdown_parser.dart';
 export 'src/parsers/fhir_json_parser.dart';
 export 'src/parsers/hl7v2_parser.dart';
 export 'src/parsers/iso20022_parser.dart';
 export 'src/parsers/json_support.dart';
 export 'src/parsers/nitf_parser.dart';
+export 'src/parsers/ooxml_parser.dart';
 export 'src/parsers/x12_parser.dart';
 export 'src/parsers/usmtf_parser.dart';
 export 'src/parsers/step_parser.dart';

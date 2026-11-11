@@ -16,14 +16,37 @@ Exceptions are stable by type:
 
 ## Warning Code Prefixes
 
-- `dicom.*` — DICOM transfer syntax, sequence, truncation, delimiter, and
-  encapsulation warnings.
+Prefixes are stable. Individual codes may be added within a family; consumers
+must not assume the set is exhaustive.
+
+- `dicom.*` — DICOM transfer syntax, sequence, truncation, delimiter,
+  encapsulation, SR, and DICOM JSON warnings.
 - `nitf.*` — NITF segment table, length, and bounds warnings.
-- `pdf.*` — PDF page extraction, embedded file, text-layer, and decode warnings.
+- `pdf.*` — PDF page extraction, embedded file, text-layer, visual, XMP, and
+  decode warnings.
 - `stanag4607.*` — GMTI segment body and segment-size warnings.
 - `stanag4609.*` — motion-imagery KLV presence/decode warnings.
 - `stanag5516.*` — Link 16 framed-message warnings.
 - `stanag7023.*` — NPIF header and segment-index warnings.
+- `odf.*` — OpenDocument metadata, table, sheet, slide, attachment, and
+  decompression warnings.
+- `ooxml.*` — DOCX/XLSX/PPTX sheet, slide, table, attachment, entry, and
+  decompression warnings.
+- `epub.*` — OCF/OPF navigation, chapter, script, encryption, DRM, page, entry,
+  attachment, and decompression warnings.
+- `eml.*` — MIME attachment and byte-limit warnings.
+- `html.*` — external-resource and table-limit warnings.
+- `markdown.*` — unclosed-fence and truncation warnings.
+- `csv.*` — quote, row/column, encoding, and truncation warnings.
+- `image.*` — EXIF/PNG/WebP bounds, SVG script/external-reference, and
+  truncation warnings.
+- `cda.*` — CDA section, narrative, media, attachment, and truncation warnings.
+- `iso20022.*` — ISO 20022 group-header, amount, transaction, and truncation
+  warnings.
+- `fhir.*` — FHIR namespace and resource-type warnings.
+- `edifact.*` — EDIFACT envelope and text-decoding warnings.
+- `json.*` — generic JSON extraction and truncation warnings.
+- `parse.*` — registry-level text/metadata truncation and limit warnings.
 
 ## Localization Contract
 

@@ -39,6 +39,21 @@ class XmlSupport {
     return colon == -1 ? raw : raw.substring(colon + 1);
   }
 
+  /// All top-level attribute names of the root element as seen in the prefix,
+  /// including namespace declarations.
+  static List<String> rootAttributeNames(String prefix) {
+    var s = prefix.trimLeft();
+    s = s.replaceFirst(RegExp(r'<\?xml.*?\?>', dotAll: true), '');
+    s = s.replaceAll(RegExp(r'<!--.*?-->', dotAll: true), '');
+    s = s.replaceAll(RegExp(r'<\?.*?\?>', dotAll: true), '');
+    final match = RegExp(r'<\s*[A-Za-z_][\w.-]*(\s[^>]*)?>').firstMatch(s);
+    if (match == null || match.groupCount < 1) return const [];
+    return RegExp(r'([\w.-:]+)\s*=')
+        .allMatches(match.group(1)!)
+        .map((m) => m.group(1)!)
+        .toList(growable: false);
+  }
+
   static XmlDocument parse(Uint8List bytes) {
     final String source;
     try {
@@ -55,16 +70,22 @@ class XmlSupport {
 
   static const _textAttributes = {'value', 'displayName'};
 
-  /// Harvests human-readable text in document order: element text nodes, then
+  /// Harvests human-readable text in document order: root element text (where
+  /// a simple XML value is its own root text), element text nodes, and
   /// value-bearing attributes. Deduplication is intentionally avoided so the
   /// content id reflects the document faithfully.
   static String extractText(XmlElement root) {
     final buffer = StringBuffer();
+    // Root-level text: a simple `<root>value</root>` document carries its
+    // payload as root text, so emit it before descending.
+    final rootText = root.innerText.trim();
+    if (rootText.isNotEmpty) buffer.writeln(rootText);
     for (final node in root.descendantElements) {
       for (final attr in _textAttributes) {
         final v = node.getAttribute(attr);
         if (v != null && v.trim().isNotEmpty) buffer.writeln(v.trim());
       }
+      // Attribute names themselves carry no payload; only text-bearing values.
       for (final child in node.children) {
         if (child is XmlText || child is XmlCDATA) {
           final t = child.value?.trim() ?? '';

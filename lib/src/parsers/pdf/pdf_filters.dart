@@ -12,17 +12,37 @@ import '../../core/parse_exception.dart';
 /// cross-reference and object streams. Image-only filters (DCTDecode,
 /// JPXDecode, CCITTFaxDecode, JBIG2Decode) are passed through untouched.
 
+/// Default per-stream decompression ceiling (64 MiB).
+const int defaultMaxDecompressedBytes = 64 * 1024 * 1024;
+
 /// Inflates a FlateDecode stream (zlib wrapper; falls back to raw deflate).
-Uint8List inflate(Uint8List data) {
+///
+/// [maxOutputBytes] is enforced by the archive decoder itself, so a compression
+/// bomb is rejected before it can allocate its full output.
+Uint8List inflate(
+  Uint8List data, {
+  int maxOutputBytes = defaultMaxDecompressedBytes,
+}) {
   try {
     return Uint8List.fromList(
-      const ZLibDecoder().decodeBytes(data, verify: false),
+      const ZLibDecoder().decodeBytes(
+        data,
+        verify: false,
+        maxOutputSize: maxOutputBytes,
+      ),
     );
   } catch (_) {
     try {
-      return Uint8List.fromList(Inflate(data).getBytes());
-    } catch (e) {
-      throw MalformedDocumentException('FlateDecode failed: $e');
+      return Uint8List.fromList(
+        const ZLibDecoder().decodeBytes(
+          data,
+          verify: false,
+          raw: true,
+          maxOutputSize: maxOutputBytes,
+        ),
+      );
+    } catch (_) {
+      throw const MalformedDocumentException('FlateDecode failed');
     }
   }
 }
@@ -32,22 +52,35 @@ Uint8List inflate(Uint8List data) {
 Uint8List decodeStream(
   Uint8List data,
   List<String> filters,
-  List<Map<String, int>?> parms,
-) {
+  List<Map<String, int>?> parms, {
+  int maxOutputBytes = defaultMaxDecompressedBytes,
+}) {
   var out = data;
   for (var i = 0; i < filters.length; i++) {
     final p = i < parms.length ? parms[i] : null;
     switch (filters[i]) {
       case 'FlateDecode' || 'Fl':
-        out = _predict(inflate(out), p);
+        out = _predict(
+          inflate(out, maxOutputBytes: maxOutputBytes),
+          p,
+          maxOutputBytes,
+        );
       case 'LZWDecode' || 'LZW':
-        out = _predict(lzwDecode(out, earlyChange: p?['EarlyChange'] ?? 1), p);
+        out = _predict(
+          lzwDecode(
+            out,
+            earlyChange: p?['EarlyChange'] ?? 1,
+            maxOutputBytes: maxOutputBytes,
+          ),
+          p,
+          maxOutputBytes,
+        );
       case 'ASCIIHexDecode' || 'AHx':
-        out = asciiHexDecode(out);
+        out = asciiHexDecode(out, maxOutputBytes: maxOutputBytes);
       case 'ASCII85Decode' || 'A85':
-        out = ascii85Decode(out);
+        out = ascii85Decode(out, maxOutputBytes: maxOutputBytes);
       case 'RunLengthDecode' || 'RL':
-        out = runLengthDecode(out);
+        out = runLengthDecode(out, maxOutputBytes: maxOutputBytes);
       default:
         break; // image/unsupported filter: leave bytes as-is
     }
@@ -55,7 +88,15 @@ Uint8List decodeStream(
   return out;
 }
 
-Uint8List _predict(Uint8List data, Map<String, int>? p) {
+void _guard(int current, int adding, int max) {
+  if (adding < 0 || current > max - adding) {
+    throw const MalformedDocumentException(
+      'stream decompression exceeded the configured limit',
+    );
+  }
+}
+
+Uint8List _predict(Uint8List data, Map<String, int>? p, int maxOutputBytes) {
   final predictor = p?['Predictor'] ?? 1;
   if (predictor < 2) return data;
   return applyPredictor(
@@ -64,11 +105,15 @@ Uint8List _predict(Uint8List data, Map<String, int>? p) {
     p?['Colors'] ?? 1,
     p?['BitsPerComponent'] ?? 8,
     p?['Columns'] ?? 1,
+    maxOutputBytes: maxOutputBytes,
   );
 }
 
 /// ASCIIHexDecode: pairs of hex digits up to the `>` terminator.
-Uint8List asciiHexDecode(Uint8List data) {
+Uint8List asciiHexDecode(
+  Uint8List data, {
+  int maxOutputBytes = defaultMaxDecompressedBytes,
+}) {
   final hex = StringBuffer();
   for (final c in data) {
     if (c == 0x3E) break; // '>'
@@ -83,12 +128,20 @@ Uint8List asciiHexDecode(Uint8List data) {
   final out = Uint8List(h.length ~/ 2);
   for (var i = 0; i < out.length; i++) {
     out[i] = int.parse(h.substring(i * 2, i * 2 + 2), radix: 16);
+    if (i >= maxOutputBytes) {
+      throw const MalformedDocumentException(
+        'ASCIIHexDecode exceeded the configured limit',
+      );
+    }
   }
   return out;
 }
 
 /// ASCII85Decode: base-85, 5 chars → 4 bytes, `z` → 4 zero bytes, `~>` EOD.
-Uint8List ascii85Decode(Uint8List data) {
+Uint8List ascii85Decode(
+  Uint8List data, {
+  int maxOutputBytes = defaultMaxDecompressedBytes,
+}) {
   final out = BytesBuilder();
   var tuple = 0;
   var count = 0;
@@ -106,6 +159,7 @@ Uint8List ascii85Decode(Uint8List data) {
       continue;
     }
     if (c == 0x7A && count == 0) {
+      _guard(out.length, 4, maxOutputBytes);
       out
         ..addByte(0)
         ..addByte(0)
@@ -116,6 +170,7 @@ Uint8List ascii85Decode(Uint8List data) {
     if (c < 0x21 || c > 0x75) continue;
     tuple = tuple * 85 + (c - 0x21);
     if (++count == 5) {
+      _guard(out.length, 4, maxOutputBytes);
       out
         ..addByte((tuple >> 24) & 0xFF)
         ..addByte((tuple >> 16) & 0xFF)
@@ -135,6 +190,7 @@ Uint8List ascii85Decode(Uint8List data) {
       (tuple >> 8) & 0xFF,
       tuple & 0xFF,
     ];
+    _guard(out.length, count - 1, maxOutputBytes);
     for (var k = 0; k < count - 1; k++) {
       out.addByte(all[k]);
     }
@@ -143,7 +199,10 @@ Uint8List ascii85Decode(Uint8List data) {
 }
 
 /// RunLengthDecode per PDF 7.4.5.
-Uint8List runLengthDecode(Uint8List data) {
+Uint8List runLengthDecode(
+  Uint8List data, {
+  int maxOutputBytes = defaultMaxDecompressedBytes,
+}) {
   final out = BytesBuilder();
   var i = 0;
   while (i < data.length) {
@@ -151,11 +210,13 @@ Uint8List runLengthDecode(Uint8List data) {
     if (len == 128) break; // EOD
     if (len < 128) {
       final n = len + 1;
+      _guard(out.length, n, maxOutputBytes);
       for (var k = 0; k < n && i < data.length; k++) {
         out.addByte(data[i++]);
       }
     } else {
       final n = 257 - len;
+      _guard(out.length, n, maxOutputBytes);
       if (i < data.length) {
         final b = data[i++];
         for (var k = 0; k < n; k++) {
@@ -168,7 +229,11 @@ Uint8List runLengthDecode(Uint8List data) {
 }
 
 /// Variable-width (9–12 bit) LZWDecode with PDF EarlyChange semantics.
-Uint8List lzwDecode(Uint8List data, {int earlyChange = 1}) {
+Uint8List lzwDecode(
+  Uint8List data, {
+  int earlyChange = 1,
+  int maxOutputBytes = defaultMaxDecompressedBytes,
+}) {
   const clearCode = 256;
   const eodCode = 257;
   final out = BytesBuilder();
@@ -216,6 +281,7 @@ Uint8List lzwDecode(Uint8List data, {int earlyChange = 1}) {
     } else {
       break; // corrupt stream
     }
+    _guard(out.length, entry.length, maxOutputBytes);
     out.add(entry);
     if (prev != null) {
       table.add([...prev, entry.first]);
@@ -234,15 +300,19 @@ Uint8List applyPredictor(
   int predictor,
   int colors,
   int bitsPerComponent,
-  int columns,
-) {
+  int columns, {
+  int maxOutputBytes = defaultMaxDecompressedBytes,
+}) {
   if (predictor < 2) return data;
-  final bytesPerPixel = ((colors * bitsPerComponent + 7) ~/ 8).clamp(
-    1,
-    1 << 24,
-  );
-  final rowBytes = (colors * bitsPerComponent * columns + 7) ~/ 8;
-  if (rowBytes <= 0) return data;
+  if (colors <= 0 || bitsPerComponent <= 0 || columns <= 0) return data;
+  final bppWide = colors * bitsPerComponent;
+  if (bppWide > 1 << 24) return data;
+  final bytesPerPixel = ((bppWide + 7) ~/ 8).clamp(1, 1 << 20);
+  final rowBits = bppWide * columns;
+  if (rowBits > (1 << 31) - 1) return data;
+  final rowBytes = (rowBits + 7) ~/ 8;
+  // A row cannot be larger than the available decoded data plus one filter byte.
+  if (rowBytes <= 0 || rowBytes > data.length) return data;
 
   if (predictor == 2) {
     if (bitsPerComponent != 8) {

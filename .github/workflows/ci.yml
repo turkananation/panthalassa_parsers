@@ -11,27 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          path: panthalassa_parsers
-
-      - name: Create workspace
-        run: |
-          cat > pubspec.yaml <<'YAML'
-          name: _
-          publish_to: none
-          environment:
-            sdk: '^3.10.3'
-          workspace:
-            - panthalassa_parsers
-          YAML
 
       - uses: dart-lang/setup-dart@v1
         with:
-          sdk: 3.12.0
+          sdk: 3.13.5
       - run: dart pub get
+      - run: dart run tool/version/generate_version.dart --check
       - run: dart analyze
-        working-directory: panthalassa_parsers
       - run: dart test
-        working-directory: panthalassa_parsers
+      - run: dart run bin/panthalassa.dart version --json
+      - run: dart run bin/panthalassa.dart formats --json > /dev/null
+      - run: dart run bin/panthalassa.dart parse README.md --json > /dev/null
+      - run: dart compile exe bin/panthalassa.dart -o /tmp/panthalassa_cli
       - run: dart compile js -O2 -o /tmp/panthalassa_web_smoke.js tool/web_smoke.dart
-        working-directory: panthalassa_parsers

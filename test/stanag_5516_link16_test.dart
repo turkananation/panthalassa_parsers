@@ -54,9 +54,6 @@ void main() {
           final messages = metadata['messages'] as List;
           expect(messages[0]['label'], equals('J3.2'));
           expect(messages[1]['label'], equals('J2.2'));
-
-          print('--- Test Execution Success ---');
-          print('Captured Metadata Matrix: $metadata');
         } on ParseException catch (exception) {
           fail(
             'Parsing execution failed with package-level ParseException: $exception',

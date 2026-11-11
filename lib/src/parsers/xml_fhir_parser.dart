@@ -55,6 +55,7 @@ final class XmlFhirParser implements DocumentParser {
 
   @override
   ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) {
+    final digest = hasher.digestFor(bytes);
     final doc = XmlSupport.parse(bytes);
     final root = doc.rootElement;
     final resourceType = root.localName;
@@ -78,7 +79,8 @@ final class XmlFhirParser implements DocumentParser {
     }
 
     return ParseResult(
-      documentId: hasher.idFor(bytes),
+      documentId: digest.sha256,
+      digest: digest,
       format: format,
       byteLength: bytes.length,
       metadata: {

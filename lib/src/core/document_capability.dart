@@ -22,7 +22,15 @@ extension DocumentParserCapabilities on DocumentParser {
       DocumentCapability.metadata,
       DocumentCapability.attachments,
     },
-    DocumentFormat.dicom || DocumentFormat.nitf => const {
+    DocumentFormat.dicom => const {
+      DocumentCapability.text,
+      DocumentCapability.metadata,
+      DocumentCapability.structure,
+      DocumentCapability.tables,
+      DocumentCapability.attachments,
+      DocumentCapability.media,
+    },
+    DocumentFormat.nitf => const {
       DocumentCapability.metadata,
       DocumentCapability.structure,
       DocumentCapability.media,
@@ -36,16 +44,71 @@ extension DocumentParserCapabilities on DocumentParser {
       DocumentCapability.text,
       DocumentCapability.metadata,
       DocumentCapability.structure,
+      DocumentCapability.tables,
+      DocumentCapability.attachments,
+    },
+    DocumentFormat.docx || DocumentFormat.xlsx || DocumentFormat.pptx => const {
+      DocumentCapability.text,
+      DocumentCapability.metadata,
+      DocumentCapability.structure,
+      DocumentCapability.tables,
+      DocumentCapability.attachments,
     },
     DocumentFormat.fhirJson ||
     DocumentFormat.fhirXml ||
     DocumentFormat.hl7v2 ||
-    DocumentFormat.cda ||
     DocumentFormat.verifiableCredential ||
     DocumentFormat.niem ||
-    DocumentFormat.iso20022 ||
     DocumentFormat.edifact ||
     DocumentFormat.x12 ||
+    DocumentFormat.eml => const {
+      DocumentCapability.text,
+      DocumentCapability.metadata,
+      DocumentCapability.structure,
+    },
+    DocumentFormat.cda => const {
+      DocumentCapability.text,
+      DocumentCapability.metadata,
+      DocumentCapability.structure,
+      DocumentCapability.tables,
+      DocumentCapability.attachments,
+    },
+    DocumentFormat.iso20022 => const {
+      DocumentCapability.text,
+      DocumentCapability.metadata,
+      DocumentCapability.structure,
+      DocumentCapability.tables,
+    },
+    DocumentFormat.html => const {
+      DocumentCapability.text,
+      DocumentCapability.metadata,
+      DocumentCapability.structure,
+      DocumentCapability.tables,
+    },
+    DocumentFormat.image => const {
+      DocumentCapability.metadata,
+      DocumentCapability.media,
+    },
+    DocumentFormat.epub => const {
+      DocumentCapability.text,
+      DocumentCapability.metadata,
+      DocumentCapability.structure,
+      DocumentCapability.tables,
+      DocumentCapability.attachments,
+      DocumentCapability.media,
+    },
+    DocumentFormat.markdown => const {
+      DocumentCapability.text,
+      DocumentCapability.metadata,
+      DocumentCapability.structure,
+      DocumentCapability.tables,
+    },
+    DocumentFormat.csv => const {
+      DocumentCapability.text,
+      DocumentCapability.metadata,
+      DocumentCapability.structure,
+      DocumentCapability.tables,
+    },
     DocumentFormat.step ||
     DocumentFormat.usmtf ||
     DocumentFormat.json ||
