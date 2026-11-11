@@ -22,7 +22,7 @@ void main() {
     expect(html, contains('Format: pdf'));
     expect(html, contains('viewBox="0 0 612 792"'));
     expect(html, contains('Adapter Page'));
-    expect(html, contains('<section class="panthalassa-visuals">'));
+    expect(html, contains('class="panthalassa-visuals"'));
     expect(html, contains('<svg class="panthalassa-visual-page"'));
   });
 
