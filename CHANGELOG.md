@@ -29,7 +29,10 @@
   high-confidence and marks them with `hint-match` evidence; ambiguous text
   formats still never claim files without a filename/MIME hint.
 - **Packaging and CI:** standalone package resolution, Dart 3.13.5 CI, CLI
-  version generation/check, CLI smoke coverage, and web compile smoke target.
+  version generation/check, CLI smoke coverage, web compile smoke target, and
+  pub.dev-facing metadata/example fixes. Dependencies now floor at
+  `archive` 4.6 and `xml` 7.1, and the web/WASM hash backend avoids pqforge's
+  `dart:isolate` barrel while producing identical digests.
 
 ## 0.5.0
 

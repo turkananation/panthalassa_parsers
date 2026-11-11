@@ -75,23 +75,23 @@ final class Stanag4676TrackingParser implements StanagSubParser {
   @override
   StanagParse parse(Uint8List bytes) {
     final doc = _XmlPeek.parse(bytes, standard);
-    final tracks = doc.findAllElements('Track', namespace: '*').length;
+    final tracks = doc.findAllElements('Track', namespaceUri: '*').length;
     final points =
-        doc.findAllElements('TrackPoint', namespace: '*').length +
-        doc.findAllElements('TrackPointDetail', namespace: '*').length;
+        doc.findAllElements('TrackPoint', namespaceUri: '*').length +
+        doc.findAllElements('TrackPointDetail', namespaceUri: '*').length;
     final security = doc
-        .findAllElements('securityClassification', namespace: '*')
+        .findAllElements('securityClassification', namespaceUri: '*')
         .firstOrNull
         ?.innerText
         .trim();
     final source = doc
-        .findAllElements('trackSource', namespace: '*')
+        .findAllElements('trackSource', namespaceUri: '*')
         .firstOrNull
         ?.innerText
         .trim();
 
     final ids = doc
-        .findAllElements('trackNumber', namespace: '*')
+        .findAllElements('trackNumber', namespaceUri: '*')
         .map((e) => e.innerText.trim())
         .where((s) => s.isNotEmpty)
         .toList();
@@ -111,7 +111,7 @@ final class Stanag4676TrackingParser implements StanagSubParser {
   }
 
   List<Map<String, Object?>> _trackKinematics(XmlDocument doc) {
-    final tracks = doc.findAllElements('Track', namespace: '*');
+    final tracks = doc.findAllElements('Track', namespaceUri: '*');
     final out = <Map<String, Object?>>[];
     for (final track in tracks) {
       final trackNumber = _firstText(track, const [
@@ -121,8 +121,8 @@ final class Stanag4676TrackingParser implements StanagSubParser {
       ]);
       final points = <Map<String, Object?>>[];
       final pointElements = [
-        ...track.findElements('TrackPoint', namespace: '*'),
-        ...track.findElements('TrackPointDetail', namespace: '*'),
+        ...track.findElements('TrackPoint', namespaceUri: '*'),
+        ...track.findElements('TrackPointDetail', namespaceUri: '*'),
       ];
       for (final point in pointElements) {
         final parsed = <String, Object?>{};
@@ -172,7 +172,7 @@ final class Stanag4676TrackingParser implements StanagSubParser {
   String? _firstText(XmlElement parent, List<String> names) {
     for (final name in names) {
       final value = parent
-          .findElements(name, namespace: '*')
+          .findElements(name, namespaceUri: '*')
           .firstOrNull
           ?.innerText
           .trim();
@@ -211,17 +211,17 @@ final class Stanag4774LabelParser implements StanagSubParser {
   StanagParse parse(Uint8List bytes) {
     final doc = _XmlPeek.parse(bytes, standard);
     final policy = doc
-        .findAllElements('PolicyIdentifier', namespace: '*')
+        .findAllElements('PolicyIdentifier', namespaceUri: '*')
         .firstOrNull
         ?.innerText
         .trim();
     final classification = doc
-        .findAllElements('Classification', namespace: '*')
+        .findAllElements('Classification', namespaceUri: '*')
         .firstOrNull
         ?.innerText
         .trim();
     final categories = doc
-        .findAllElements('Category', namespace: '*')
+        .findAllElements('Category', namespaceUri: '*')
         .map(
           (e) =>
               e.getAttribute('TagName') ??
@@ -275,13 +275,13 @@ final class Stanag4778BindingParser implements StanagSubParser {
   StanagParse parse(Uint8List bytes) {
     final doc = _XmlPeek.parse(bytes, standard);
     final bindings =
-        doc.findAllElements('Binding', namespace: '*').length +
-        doc.findAllElements('MetadataBinding', namespace: '*').length;
+        doc.findAllElements('Binding', namespaceUri: '*').length +
+        doc.findAllElements('MetadataBinding', namespaceUri: '*').length;
     final hasLabel = doc
-        .findAllElements('OriginatorConfidentialityLabel', namespace: '*')
+        .findAllElements('OriginatorConfidentialityLabel', namespaceUri: '*')
         .isNotEmpty;
     final hasSignature = doc
-        .findAllElements('Signature', namespace: '*')
+        .findAllElements('Signature', namespaceUri: '*')
         .isNotEmpty;
 
     return StanagParse(

@@ -1,11 +1,10 @@
 name: panthalassa_parsers
 description: >-
-  Pure-Dart, zero-FFI parsers for structured, binary, and composite documents:
-  FHIR, HL7 v2/CDA, ISO 20022, EDI, DICOM, NITF, STANAG, PDF, ODF, OOXML, EPUB,
-  email, HTML, Markdown, CSV, and image metadata. Produces SHA-256/384/512
-  content-addressed, isolate-safe parse results for the Panthalassa Vault.
+  Pure-Dart, zero-FFI document parsers for healthcare, EDI, binary, PDF, office,
+  EPUB, email, HTML, Markdown, CSV and common image documents, with
+  SHA-256/384/512 content addressing.
 version: 0.5.1
-homepage: https://turkananation.github.io/panthalassa_parsers
+homepage: https://github.com/turkananation/panthalassa_parsers
 repository: https://github.com/turkananation/panthalassa_parsers
 
 environment:
@@ -28,13 +27,13 @@ executables:
   panthalassa: panthalassa
 
 dependencies:
-  archive: ^4.0.9   # pure-Dart ZIP + inflate (ODF container, PDF FlateDecode); no dart:io
+  archive: ^4.6.0   # pure-Dart ZIP + inflate (ODF container, PDF FlateDecode); no dart:io
   args: ^2.7.0      # CLI argument/subcommand parsing (bin/ only)
   meta: ^1.16.0
-  pointycastle: ^4.0.0
-  pqforge: ^0.4.14  # PqBytes SHA-256/SHA-384/SHA-512 — single hash path across the vault
+  pointycastle: ^4.0.0  # SHA-2 digests for the web/WASM hash backend
+  pqforge: ^0.4.14  # PqBytes SHA-256/SHA-384/SHA-512 — native hash path
   swissarmyknife: ^0.1.0  # safe JSON traversal, collection/byte helpers, bounded task queue
-  xml: ^6.5.0       # FHIR/XML + ODF/OOXML content
+  xml: ^7.1.0       # FHIR/XML + ODF/OOXML content
 
 dev_dependencies:
   lints: ^6.0.0

@@ -1,6 +1,6 @@
 // Minimal CLI to exercise the parsers on a real file.
 //
-//   dart run example/parse_file.dart path/to/document.pdf
+//   dart run example/main.dart path/to/document.pdf
 //
 // Uses dart:io only here in the example (not in the library), so the library
 // stays web-safe.
@@ -11,7 +11,7 @@ import 'package:panthalassa_parsers/panthalassa_parsers.dart';
 
 Future<void> main(List<String> args) async {
   if (args.isEmpty) {
-    stderr.writeln('usage: dart run example/parse_file.dart <file>');
+    stderr.writeln('usage: dart run example/main.dart <file>');
     exitCode = 64;
     return;
   }

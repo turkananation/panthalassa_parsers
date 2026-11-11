@@ -423,13 +423,13 @@ final class OoxmlParser
     final name = table.getAttribute('tblCaption')?.trim();
     final rows = <List<String>>[];
     var truncated = false;
-    for (final rowEl in table.findAllElements('tr', namespace: '*')) {
+    for (final rowEl in table.findAllElements('tr', namespaceUri: '*')) {
       if (rows.length >= options.limits.maxTableRows) {
         truncated = true;
         break;
       }
       final cells = <String>[];
-      for (final cellEl in rowEl.findAllElements('tc', namespace: '*')) {
+      for (final cellEl in rowEl.findAllElements('tc', namespaceUri: '*')) {
         if (cells.length >= options.limits.maxTableColumns) {
           truncated = true;
           break;
@@ -448,7 +448,7 @@ final class OoxmlParser
 
   String _docxCellText(XmlElement tc) {
     final parts = <String>[];
-    for (final p in tc.findAllElements('p', namespace: '*')) {
+    for (final p in tc.findAllElements('p', namespaceUri: '*')) {
       final t = p.innerText.trim();
       if (t.isNotEmpty) parts.add(t);
     }
@@ -504,9 +504,9 @@ final class OoxmlParser
         continue;
       }
       final rows = <List<String>>[];
-      for (final row in sheet.findAllElements('row', namespace: '*')) {
+      for (final row in sheet.findAllElements('row', namespaceUri: '*')) {
         final cells = <String>[];
-        for (final c in row.findAllElements('c', namespace: '*')) {
+        for (final c in row.findAllElements('c', namespaceUri: '*')) {
           cells.add(_xlsxCellValue(c, sharedStrings));
         }
         if (cells.isNotEmpty) rows.add(cells);
@@ -570,7 +570,7 @@ final class OoxmlParser
     try {
       final doc = XmlDocument.parse(utf8.decode(data, allowMalformed: true));
       var index = 0;
-      for (final si in doc.findAllElements('si', namespace: '*')) {
+      for (final si in doc.findAllElements('si', namespaceUri: '*')) {
         out[index.toString()] = si.innerText;
         index++;
       }
@@ -634,7 +634,7 @@ final class OoxmlParser
         continue;
       }
       final blocks = <TextBlock>[];
-      for (final p in slide.findAllElements('p', namespace: '*')) {
+      for (final p in slide.findAllElements('p', namespaceUri: '*')) {
         final t = p.innerText.trim();
         if (t.isNotEmpty) {
           textParts.add(t);
@@ -642,7 +642,7 @@ final class OoxmlParser
         }
       }
       // Heading-like: any run with bold or large font size
-      for (final r in slide.findAllElements('r', namespace: '*')) {
+      for (final r in slide.findAllElements('r', namespaceUri: '*')) {
         final t = r.innerText.trim();
         if (t.isNotEmpty && t.length > 3 && !textParts.last.contains(t)) {
           // treat as potential heading
@@ -762,7 +762,7 @@ final class OoxmlParser
     );
     if (sheetsXml == null) return;
     final doc = XmlDocument.parse(sheetsXml);
-    for (final sheet in doc.findAllElements('sheet', namespace: '*')) {
+    for (final sheet in doc.findAllElements('sheet', namespaceUri: '*')) {
       final name = _attr(sheet, 'name');
       final rId = _attr(sheet, 'id') ?? _attr(sheet, 'sheetId');
       final target = rels[rId ?? ''];
@@ -807,7 +807,10 @@ final class OoxmlParser
     if (data == null) return out;
     try {
       final doc = XmlDocument.parse(data);
-      for (final rel in doc.findAllElements('Relationship', namespace: '*')) {
+      for (final rel in doc.findAllElements(
+        'Relationship',
+        namespaceUri: '*',
+      )) {
         final id = rel.getAttribute('Id') ?? rel.getAttribute('id');
         final target = rel.getAttribute('Target');
         final type = rel.getAttribute('Type');
@@ -827,7 +830,7 @@ final class OoxmlParser
       final out = <String, Object?>{};
       void put(String key, String local) {
         final v = doc
-            .findAllElements(local, namespace: '*')
+            .findAllElements(local, namespaceUri: '*')
             .firstOrNull
             ?.innerText
             .trim();
@@ -855,7 +858,7 @@ final class OoxmlParser
       final out = <String, Object?>{};
       void put(String key, String local) {
         final v = doc
-            .findAllElements(local, namespace: '*')
+            .findAllElements(local, namespaceUri: '*')
             .firstOrNull
             ?.innerText
             .trim();
