@@ -32,8 +32,9 @@ package pure Dart, web-safe, and honest about unsupported format features.
 | PDF image codec decode | Not started | DCT, JPX, CCITT, JBIG2 and color spaces decode or fail closed with diagnostics. | Future image fixture suite. |
 | DICOM pixel decode | Complete initial (viewer path) | Uncompressed implicit/explicit LE, explicit BE, deflated, RLE, and JPEG-baseline frames decode to PNG with rescale/windowing; unsupported codecs fail closed with notices. | `lib/src/parsers/dicom/dicom_image.dart`; `test/dicom_image_test.dart`; CLI `view`. |
 | NITF pixel/tile decode | Not started | NITF image segments decode/lazily tile with safe resource limits. | Future NITF imagery fixtures. |
-| Flutter canvas adapter | Not started | Separate Flutter layer maps display-list commands to `CustomPainter`, selection/search overlay, and lazy pages. | Flutter widget tests/screenshots. |
-| Jaspr visual adapter | Not started | Separate Jaspr/web layer consumes SVG or typed display-list components safely. | Jaspr smoke test. |
+| Pure-Dart HTML page adapter | Complete | `DocumentPageAdapter` combines `DocumentIr` (semantic) and `VisualDocument` (faithful SVG pages) into one self-contained HTML page, framework-free and web-safe. | `lib/src/render/document_page_adapter.dart`; `test/document_page_adapter_test.dart`. |
+| Flutter canvas adapter | Not started | Separate Flutter layer maps display-list commands to `CustomPainter`, selection/search overlay, and lazy pages. Consumes the same `DocumentIr`/`VisualDocument` model. | Flutter widget tests/screenshots. |
+| Jaspr visual adapter | Not started | Separate Jaspr/web layer consumes SVG or typed display-list components safely. Consumes the same `DocumentIr`/`VisualDocument` model. | Jaspr smoke test. |
 
 ## Current Fidelity Contract
 

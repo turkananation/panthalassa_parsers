@@ -76,6 +76,7 @@ export 'src/render/document_renderer.dart';
 export 'src/render/visual_document.dart';
 export 'src/render/visual_primitives.dart';
 export 'src/render/visual_renderer.dart';
+export 'src/render/document_page_adapter.dart';
 
 export 'src/view/csv_view_builder.dart';
 export 'src/view/dicom_view_builder.dart';

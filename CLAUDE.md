@@ -114,6 +114,7 @@ lib/
     visual_primitives.dart         # pure-Dart page/frame geometry + visual commands
     visual_document.dart           # DIR -> VisualDocument projection
     visual_renderer.dart           # SVG visual renderer
+    document_page_adapter.dart     # pure-Dart HTML page adapter (semantic + visual)
     stanag/
       stanag_parser.dart           # family dispatcher + StanagSubParser contract
       stanag_4607_gmti.dart        # GMTI (binary)

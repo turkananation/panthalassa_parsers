@@ -14,6 +14,7 @@ import 'package:args/command_runner.dart';
 import 'package:panthalassa_parsers/panthalassa_parsers.dart';
 
 import 'src/batch_command.dart';
+import 'src/completions_command.dart';
 import 'src/console.dart';
 import 'src/digest_command.dart';
 import 'src/inspect_commands.dart';
@@ -30,7 +31,7 @@ const Map<String, List<String>> _groups = {
   'Inspect': ['detect', 'formats'],
   'Parse & render': ['parse', 'render', 'view', 'batch'],
   'Content address': ['digest'],
-  'Maintenance': ['version'],
+  'Maintenance': ['version', 'completions'],
 };
 
 Future<void> main(List<String> args) async {
@@ -123,6 +124,7 @@ final class PanthalassaRunner extends CommandRunner<void> {
     addCommand(BatchCommand());
     addCommand(DigestCommand());
     addCommand(VersionCommand());
+    addCommand(CompletionsCommand());
   }
 
   @override
