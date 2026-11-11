@@ -147,11 +147,12 @@ from the exact input bytes:
 - `sha512` — cross-system interop
 
 `result.documentId` and `result.digest!.sha256` are the same value;
-`result.sha384` and `result.sha512` are convenience getters. All three
-hashes come from `pqforge`'s `PqBytes` primitives, so a document id minted here
-matches one minted by the sealing pipeline, audit chain, or AAD binding. Results
-also carry `schemaVersion` and `parserVersion` so downstream vaults can explain
-output-shape changes.
+`result.sha384` and `result.sha512` are convenience getters. On native platforms
+all three hashes come from `pqforge`'s `PqBytes` primitives; on web/WASM the
+hasher calls the same PointyCastle SHA-2 implementations that `PqBytes` wraps.
+Either way, a document id minted here matches one minted by the sealing pipeline,
+audit chain, or AAD binding. Results also carry `schemaVersion` and
+`parserVersion` so downstream vaults can explain output-shape changes.
 
 Inject a custom `ContentHasher` via `ParserRegistry.standard(hasher: ...)` when
 the vault supplies its own hash implementation.

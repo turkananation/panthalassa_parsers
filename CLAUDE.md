@@ -41,11 +41,12 @@ goes through `package:archive`, not `ZLibCodec` from `dart:io`.
 
 ## Dependencies
 
-- `pointycastle` — pure-Dart MD5/RC4/AES only for the PDF Standard security
-  handler. It is no longer a general hashing path.
-- `pqforge` — provides `PqBytes.sha256`, `sha384`, and `sha512`, the **single**
+- `pointycastle` — pure-Dart MD5/RC4/AES for the PDF Standard security
+  handler, plus the SHA-2 primitives behind the web/WASM hash backend.
+- `pqforge` — provides `PqBytes.sha256`, `sha384`, and `sha512`, the native
   content-hash path. `documentId` remains the SHA-256 hex string; `ContentDigest`
-  also carries SHA-384/SHA-512. One hash path, end to end.
+  also carries SHA-384/SHA-512. Web/WASM uses the same PointyCastle primitives
+  that `PqBytes` wraps, so digests remain byte-identical on every platform.
 - `archive` — pure-Dart ZIP + inflate (ODF/OOXML/EPUB containers, PDF FlateDecode).
 - `swissarmyknife` — safe JSON traversal, byte/string/collection helpers, and a
   bounded task queue used by batch parsing.
@@ -145,8 +146,11 @@ version is generated from `pubspec.yaml` and checked in CI.
 
 ## Invariants — do not regress
 
-1. **Content addressing via `PqBytes`, never `hashCode`.** The default
+1. **Content addressing via SHA-2, never `hashCode`.** The default
    `PqBytesContentHasher` produces SHA-256, SHA-384, and SHA-512 in one pass.
+   Native builds use `pqforge`'s `PqBytes`; web/WASM builds use the same
+   PointyCastle digest primitives that `PqBytes` wraps, because pqforge's public
+   barrel imports `dart:isolate` through `zeroize`. Both paths are byte-identical.
    `documentId` stays the SHA-256 hex string for backward compatibility;
    `ParseResult.sha384`/`sha512` expose the other digests. `Object.hashCode` is
    unstable across isolates/runs and collides.

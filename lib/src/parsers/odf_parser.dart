@@ -106,7 +106,7 @@ final class OdfParser implements DocumentParser, OptionAwareDocumentParser {
     // Headings first so the outline is available even for formats that also
     // emit tables/slides.
     final headings = content
-        .findAllElements('h', namespace: '*')
+        .findAllElements('h', namespaceUri: '*')
         .where((e) => e.name.local == 'h')
         .toList(growable: false);
     for (final h in headings.take(options.limits.maxPages)) {
@@ -135,7 +135,7 @@ final class OdfParser implements DocumentParser, OptionAwareDocumentParser {
     // Flat text: preserve the historical paragraph order for ODT, and add sheet
     // or slide content where the document class has no flowing paragraphs.
     if (documentClass == 'text') {
-      for (final p in content.findAllElements('p', namespace: '*')) {
+      for (final p in content.findAllElements('p', namespaceUri: '*')) {
         final t = p.innerText.trim();
         if (t.isNotEmpty) textParts.add(t);
       }
@@ -216,12 +216,12 @@ final class OdfParser implements DocumentParser, OptionAwareDocumentParser {
     List<DocumentTable> tables,
     List<ParseWarning> warnings,
   ) {
-    for (final p in content.findAllElements('p', namespace: '*')) {
+    for (final p in content.findAllElements('p', namespaceUri: '*')) {
       final t = p.innerText.trim();
       if (t.isEmpty) continue;
       blocks.add(TextBlock(spans: [TextSpan(t)], style: 'paragraph'));
     }
-    for (final table in content.findAllElements('table', namespace: '*')) {
+    for (final table in content.findAllElements('table', namespaceUri: '*')) {
       if (table.name.local != 'table') continue;
       if (tables.length >= options.limits.maxMetadataEntries) {
         warnings.add(
@@ -247,7 +247,7 @@ final class OdfParser implements DocumentParser, OptionAwareDocumentParser {
     List<ParseWarning> warnings,
   ) {
     var sheetIndex = 0;
-    for (final table in content.findAllElements('table', namespace: '*')) {
+    for (final table in content.findAllElements('table', namespaceUri: '*')) {
       if (table.name.local != 'table') continue;
       if (sheetIndex >= options.limits.maxPages) {
         warnings.add(
@@ -291,7 +291,7 @@ final class OdfParser implements DocumentParser, OptionAwareDocumentParser {
     List<ParseWarning> warnings,
   ) {
     var slideIndex = 0;
-    for (final slide in content.findAllElements('page', namespace: '*')) {
+    for (final slide in content.findAllElements('page', namespaceUri: '*')) {
       if (slide.name.local != 'page') continue;
       if (slideIndex >= options.limits.maxPages) {
         warnings.add(
@@ -304,14 +304,14 @@ final class OdfParser implements DocumentParser, OptionAwareDocumentParser {
       }
       final slideName = _attr(slide, 'name');
       final slideBlocks = <TextBlock>[];
-      for (final p in slide.findAllElements('p', namespace: '*')) {
+      for (final p in slide.findAllElements('p', namespaceUri: '*')) {
         final t = p.innerText.trim();
         if (t.isEmpty) continue;
         slideBlocks.add(TextBlock(spans: [TextSpan(t)], style: 'paragraph'));
       }
       // Speaker notes live under presentation:notes, outside draw:page text in
       // some generators; include them as a distinct role.
-      for (final notes in slide.findAllElements('notes', namespace: '*')) {
+      for (final notes in slide.findAllElements('notes', namespaceUri: '*')) {
         final t = notes.innerText.trim();
         if (t.isNotEmpty) {
           slideBlocks.add(
@@ -333,7 +333,7 @@ final class OdfParser implements DocumentParser, OptionAwareDocumentParser {
           blocks: slideBlocks,
         ),
       );
-      for (final table in slide.findAllElements('table', namespace: '*')) {
+      for (final table in slide.findAllElements('table', namespaceUri: '*')) {
         if (table.name.local != 'table') continue;
         final parsed = _table(table, options, warnings);
         if (parsed != null) tables.add(parsed);
@@ -341,7 +341,7 @@ final class OdfParser implements DocumentParser, OptionAwareDocumentParser {
       slideIndex++;
     }
     if (pages.isEmpty) {
-      for (final p in content.findAllElements('p', namespace: '*')) {
+      for (final p in content.findAllElements('p', namespaceUri: '*')) {
         final t = p.innerText.trim();
         if (t.isNotEmpty) blocks.add(TextBlock(spans: [TextSpan(t)]));
       }
@@ -358,7 +358,7 @@ final class OdfParser implements DocumentParser, OptionAwareDocumentParser {
     final name = _attr(table, 'name');
     final rows = <List<String>>[];
     var truncated = false;
-    for (final rowEl in table.findAllElements('table-row', namespace: '*')) {
+    for (final rowEl in table.findAllElements('table-row', namespaceUri: '*')) {
       final rowRepeat = (_intAttr(rowEl, 'number-rows-repeated') ?? 1).clamp(
         1,
         100000,
@@ -422,7 +422,7 @@ final class OdfParser implements DocumentParser, OptionAwareDocumentParser {
 
   String _cellText(XmlElement cell) {
     final paragraphs = cell
-        .findAllElements('p', namespace: '*')
+        .findAllElements('p', namespaceUri: '*')
         .map((p) => p.innerText.trim())
         .where((t) => t.isNotEmpty)
         .toList(growable: false);
@@ -452,7 +452,7 @@ final class OdfParser implements DocumentParser, OptionAwareDocumentParser {
     try {
       final doc = XmlDocument.parse(utf8.decode(metaBytes));
       String text(String local) => doc
-          .findAllElements(local, namespace: '*')
+          .findAllElements(local, namespaceUri: '*')
           .map((e) => e.innerText.trim())
           .firstWhere((v) => v.isNotEmpty, orElse: () => '');
 
@@ -465,17 +465,17 @@ final class OdfParser implements DocumentParser, OptionAwareDocumentParser {
       final description = text('description');
       final generator = text('generator');
       final keywords = doc
-          .findAllElements('keyword', namespace: '*')
+          .findAllElements('keyword', namespaceUri: '*')
           .map((e) => e.innerText.trim())
           .where((v) => v.isNotEmpty)
           .toList(growable: false);
       final pageCount = doc
-          .findAllElements('document-statistic', namespace: '*')
+          .findAllElements('document-statistic', namespaceUri: '*')
           .map((e) => _intAttr(e, 'page-count'))
           .whereType<int>()
           .firstOrNull;
       final wordCount = doc
-          .findAllElements('document-statistic', namespace: '*')
+          .findAllElements('document-statistic', namespaceUri: '*')
           .map((e) => _intAttr(e, 'word-count'))
           .whereType<int>()
           .firstOrNull;

@@ -1,7 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
-import 'package:pqforge/pqforge.dart';
+
+import 'sha2_backend_web.dart' if (dart.library.io) 'sha2_backend_pqforge.dart';
 
 /// A triple content digest: SHA-256 (the vault's canonical document id), plus
 /// SHA-384 and SHA-512 for long-lived integrity evidence and cross-system
@@ -50,7 +51,9 @@ final class ContentDigest {
   int get hashCode => Object.hash(sha256, sha384, sha512);
 
   @override
-  String toString() => 'ContentDigest(sha256: ${sha256.substring(0, 12)}…)';
+  String toString() => sha256.length <= 12
+      ? 'ContentDigest(sha256: $sha256)'
+      : 'ContentDigest(sha256: ${sha256.substring(0, 12)}…)';
 }
 
 /// Produces stable, content-addressed digests for a document.
@@ -71,21 +74,22 @@ abstract class ContentHasher {
   String idFor(Uint8List bytes) => digestFor(bytes).sha256;
 }
 
-/// Default content hasher: lowercase hex SHA-256, SHA-384, and SHA-512
-/// computed via the vault's `PqBytes` primitives.
+/// Default content hasher: lowercase hex SHA-256, SHA-384, and SHA-512.
 ///
-/// Using `PqBytes` (rather than a second hash implementation) keeps a single
-/// hash path across the entire Panthalassa stack, so a document id minted here
-/// is byte-identical to one minted in the sealing pipeline, the audit chain, or
-/// any AAD binding.
+/// On native platforms this calls the vault's `PqBytes` primitives. On web/WASM
+/// it calls the same PointyCastle digest implementations that `PqBytes` wraps,
+/// because pqforge's public barrel currently imports `dart:isolate` through
+/// `zeroize`. Both paths produce byte-identical digests, so a document id minted
+/// here stays compatible with the sealing pipeline, the audit chain, and any AAD
+/// binding.
 final class PqBytesContentHasher extends ContentHasher {
   const PqBytesContentHasher();
 
   @override
   ContentDigest digestFor(Uint8List bytes) => ContentDigest(
-    sha256: _hex(PqBytes.sha256(bytes)),
-    sha384: _hex(PqBytes.sha384(bytes)),
-    sha512: _hex(PqBytes.sha512(bytes)),
+    sha256: _hex(sha256Digest(bytes)),
+    sha384: _hex(sha384Digest(bytes)),
+    sha512: _hex(sha512Digest(bytes)),
   );
 
   static String _hex(Uint8List digest) {

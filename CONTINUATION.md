@@ -13,9 +13,11 @@ The audit remediation and feature roadmap through v0.5.1 are implemented and
 covered by tests:
 
 - **Content addressing:** SHA-256, SHA-384, and SHA-512 are computed in one
-  pass through `pqforge`'s `PqBytes`. `documentId` remains the SHA-256 hex value
-  for vault compatibility. `ParseResult` carries `schemaVersion` and
-  `parserVersion`.
+  pass. Native builds use `pqforge`'s `PqBytes`; web/WASM builds use the same
+  PointyCastle SHA-2 primitives that `PqBytes` wraps, because pqforge's public
+  barrel imports `dart:isolate` through `zeroize`. `documentId` remains the
+  SHA-256 hex value for vault compatibility. `ParseResult` carries
+  `schemaVersion` and `parserVersion`.
 - **Core API:** `ParseOptions` / `ParseLimits`, structured text, outline,
   tables, attachments, signature envelopes, security labels, isolate and web
   fallback runners, and bounded batch parsing.
