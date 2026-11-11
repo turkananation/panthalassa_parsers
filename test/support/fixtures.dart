@@ -759,6 +759,63 @@ Uint8List buildSimplePdf({
   return out.toBytes();
 }
 
+/// PDF using `cm` to scale by 2 and translate by (100, 100) before drawing text.
+/// Exercises the graphics-state CTM path in `PdfVisualExtractor`.
+Uint8List buildTransformedPdf({String showText = 'Scaled Text'}) {
+  final rawContent = ascii.encode(
+    'q 2 0 0 2 100 100 cm BT /F1 24 Tf 0 0 Td ($showText) Tj ET Q',
+  );
+  final streamBytes = rawContent;
+
+  final out = BytesBuilder();
+  void put(String s) => out.add(latin1.encode(s));
+
+  put('%PDF-1.7\n');
+  put('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  put('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+  put(
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] '
+    '/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n',
+  );
+  put('4 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n');
+  out.add(streamBytes);
+  put('\nendstream\nendobj\n');
+  put(
+    '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+  );
+  put('trailer\n<< /Root 1 0 R >>\n%%EOF');
+  return out.toBytes();
+}
+
+/// PDF using `q`/`Q` to save/restore graphics state: text inside the block is
+/// scaled by `cm`, text after `Q` is at the default transform.
+Uint8List buildSavedStatePdf({String inner = 'Inner', String outer = 'Outer'}) {
+  final rawContent = ascii.encode(
+    'q 3 0 0 3 50 50 cm BT /F1 18 Tf 0 0 Td ($inner) Tj ET Q '
+    'BT /F1 18 Tf 72 700 Td ($outer) Tj ET',
+  );
+  final streamBytes = rawContent;
+
+  final out = BytesBuilder();
+  void put(String s) => out.add(latin1.encode(s));
+
+  put('%PDF-1.7\n');
+  put('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  put('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+  put(
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] '
+    '/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n',
+  );
+  put('4 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n');
+  out.add(streamBytes);
+  put('\nendstream\nendobj\n');
+  put(
+    '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+  );
+  put('trailer\n<< /Root 1 0 R >>\n%%EOF');
+  return out.toBytes();
+}
+
 /// PDF with a filled rectangle plus text for visual display-list extraction.
 Uint8List buildVisualShapePdf() {
   final content = ascii.encode(

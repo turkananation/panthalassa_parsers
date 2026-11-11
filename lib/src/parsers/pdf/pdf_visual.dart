@@ -247,11 +247,12 @@ class PdfVisualExtractor {
           );
         }
       case 'f' || 'F' || 'f*':
-        _paintRects(commands, pathRects, fill: state.fill);
+        _paintRects(commands, pathRects, ctm: state.ctm, fill: state.fill);
       case 'S' || 's':
         _paintRects(
           commands,
           pathRects,
+          ctm: state.ctm,
           stroke: state.stroke,
           strokeWidth: state.strokeWidth,
         );
@@ -259,6 +260,7 @@ class PdfVisualExtractor {
         _paintRects(
           commands,
           pathRects,
+          ctm: state.ctm,
           fill: state.fill,
           stroke: state.stroke,
           strokeWidth: state.strokeWidth,
@@ -280,16 +282,17 @@ class PdfVisualExtractor {
           'mediaType': 'application/pdf-inline-image',
           'description': 'PDF inline image',
         });
-      case 'cm' ||
-          'm' ||
-          'l' ||
-          'c' ||
-          'v' ||
-          'y' ||
-          'h' ||
-          'W' ||
-          'W*' ||
-          'sh':
+      case 'cm':
+        if (stack.length >= 6) {
+          final a = stack[stack.length - 6].number ?? 0;
+          final b = stack[stack.length - 5].number ?? 0;
+          final c = stack[stack.length - 4].number ?? 0;
+          final d = stack[stack.length - 3].number ?? 0;
+          final e = stack[stack.length - 2].number ?? 0;
+          final f = stack.last.number ?? 0;
+          state.ctm = _multiplyMatrix(state.ctm, [a, b, c, d, e, f]);
+        }
+      case 'm' || 'l' || 'c' || 'v' || 'y' || 'h' || 'W' || 'W*' || 'sh':
         _markUnsupported(commands, op);
       default:
         if (_isLikelyDrawingOperator(op)) _markUnsupported(commands, op);
@@ -304,11 +307,12 @@ class PdfVisualExtractor {
     final text =
         state.font?.decode(bytes) ?? latin1.decode(bytes, allowInvalid: true);
     if (text.isEmpty) return;
+    final point = _transformPoint(state.ctm, state.textX, state.textY);
     commands.add({
       'type': 'text',
       'text': text,
-      'x': state.textX,
-      'y': state.textY,
+      'x': point.x,
+      'y': point.y,
       'fontSize': state.fontSize,
       if (state.fontName != null) 'fontName': state.fontName,
       'fill': state.fill,
@@ -319,17 +323,19 @@ class PdfVisualExtractor {
   void _paintRects(
     List<Map<String, Object?>> commands,
     List<_Rect> rects, {
+    required List<double> ctm,
     String? fill,
     String? stroke,
     double strokeWidth = 1,
   }) {
     for (final rect in rects) {
+      final transformed = _transformRect(ctm, rect);
       commands.add({
         'type': 'rect',
-        'x': rect.x,
-        'y': rect.y,
-        'width': rect.width,
-        'height': rect.height,
+        'x': transformed.x,
+        'y': transformed.y,
+        'width': transformed.width,
+        'height': transformed.height,
         'fill': ?fill,
         'stroke': ?stroke,
         'strokeWidth': strokeWidth,
@@ -710,6 +716,9 @@ final class _VisualState {
   String stroke = '#000000';
   double strokeWidth = 1;
 
+  /// Current Transformation Matrix as [a, b, c, d, e, f].
+  List<double> ctm = [1, 0, 0, 1, 0, 0];
+
   final List<_VisualState> _stack = [];
 
   void push() => _stack.add(copy());
@@ -726,6 +735,7 @@ final class _VisualState {
     fill = previous.fill;
     stroke = previous.stroke;
     strokeWidth = previous.strokeWidth;
+    ctm = List<double>.from(previous.ctm);
   }
 
   _VisualState copy() => _VisualState()
@@ -737,7 +747,47 @@ final class _VisualState {
     ..leading = leading
     ..fill = fill
     ..stroke = stroke
-    ..strokeWidth = strokeWidth;
+    ..strokeWidth = strokeWidth
+    ..ctm = List<double>.from(ctm);
+}
+
+/// Multiplies two PDF-style CTM matrices: result = m1 × m2.
+///
+/// Each matrix is [a, b, c, d, e, f] representing:
+/// | a c e |
+/// | b d f |
+/// | 0 0 1 |
+List<double> _multiplyMatrix(List<double> m1, List<double> m2) {
+  return [
+    m1[0] * m2[0] + m1[2] * m2[1], // a
+    m1[1] * m2[0] + m1[3] * m2[1], // b
+    m1[0] * m2[2] + m1[2] * m2[3], // c
+    m1[1] * m2[2] + m1[3] * m2[3], // d
+    m1[0] * m2[4] + m1[2] * m2[5] + m1[4], // e
+    m1[1] * m2[4] + m1[3] * m2[5] + m1[5], // f
+  ];
+}
+
+/// Transforms a point (x, y) by the CTM [a, b, c, d, e, f].
+/// x' = a*x + c*y + e, y' = b*x + d*y + f
+({double x, double y}) _transformPoint(List<double> ctm, double x, double y) {
+  return (
+    x: ctm[0] * x + ctm[2] * y + ctm[4],
+    y: ctm[1] * x + ctm[3] * y + ctm[5],
+  );
+}
+
+/// Transforms a rect by the CTM and returns its axis-aligned bounding box.
+_Rect _transformRect(List<double> ctm, _Rect rect) {
+  final p1 = _transformPoint(ctm, rect.x, rect.y);
+  final p2 = _transformPoint(ctm, rect.x + rect.width, rect.y);
+  final p3 = _transformPoint(ctm, rect.x, rect.y + rect.height);
+  final p4 = _transformPoint(ctm, rect.x + rect.width, rect.y + rect.height);
+  final minX = [p1.x, p2.x, p3.x, p4.x].reduce((a, b) => a < b ? a : b);
+  final maxX = [p1.x, p2.x, p3.x, p4.x].reduce((a, b) => a > b ? a : b);
+  final minY = [p1.y, p2.y, p3.y, p4.y].reduce((a, b) => a < b ? a : b);
+  final maxY = [p1.y, p2.y, p3.y, p4.y].reduce((a, b) => a > b ? a : b);
+  return _Rect(minX, minY, maxX - minX, maxY - minY);
 }
 
 final class _PageBox {

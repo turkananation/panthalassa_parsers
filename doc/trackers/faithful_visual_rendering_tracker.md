@@ -26,7 +26,7 @@ package pure Dart, web-safe, and honest about unsupported format features.
 | PDF simple text layer | Complete initial | Basic `Tf`, `Td`, `Tm`, `Tj`, `TJ`, quote operators produce positioned text commands using existing font decoding. | `test/render_engine_test.dart`. |
 | PDF simple rectangles | Complete initial | `re` plus fill/stroke operators produce rectangle commands. | `test/render_engine_test.dart`; `buildVisualShapePdf()`. |
 | PDF image placeholders | Complete initial | Inline images and image XObjects surface placeholders instead of corrupting text/operator parsing. | `test/render_engine_test.dart`; `buildInlineImagePdf()`. |
-| PDF graphics-state transforms | Not started | Correct CTM/text matrix handling for `cm`, scaling, rotation, nested graphics state, and form XObjects. | Future PDF visual fixtures. |
+| PDF graphics-state transforms | Complete | `cm` operator sets the CTM; `q`/`Q` save/restore it; applied to text position and rectangle bounding boxes. Form XObjects inherit CTM via state copy. | `lib/src/parsers/pdf/pdf_visual.dart`; `test/render_engine_test.dart`. |
 | PDF clipping/path/shading/masks | Not started | Clip paths, arbitrary paths, shadings, transparency, masks, blend modes represented or rendered. | Future conformance corpus. |
 | PDF font glyph outlines/rasterization | Not started | Embedded/CID font glyph shapes render accurately without native libraries. | Future dedicated package/suite. |
 | PDF image codec decode | Not started | DCT, JPX, CCITT, JBIG2 and color spaces decode or fail closed with diagnostics. | Future image fixture suite. |
