@@ -9,6 +9,12 @@
   conversion lives in `viewerTableSection`; PDF embed uses an inline base64
   payload decoded to a blob URL, with encrypted PDFs falling back to extracted
   text.
+- **Rendering:** `DocumentPageAdapter` adds live search, language-aware code
+  highlighting, a zoom/pan lightbox with SVG/PNG export, a persistent collapsible
+  outline, collapsible sections, attachment previews, side-by-side
+  `DocumentDiff`, and print styles. `RenderOptions.collapsibleSections`,
+  heading ids, code language classes, and CLI `completions` round out the
+  release.
 
 ## 0.5.1
 

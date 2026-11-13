@@ -43,8 +43,7 @@ final class CompletionsCommand extends Command<void> {
   String get name => 'completions';
 
   @override
-  String get description =>
-      'Print a shell completion script for panthalassa.';
+  String get description => 'Print a shell completion script for panthalassa.';
 
   @override
   String get invocation => 'panthalassa completions [--shell bash|zsh|fish]';

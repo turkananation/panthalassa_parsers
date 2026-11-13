@@ -69,6 +69,7 @@ bin/
     batch_command.dart            # bounded batch ingestion
     digest_command.dart           # SHA-256/384/512 content addressing
     view_command.dart             # HTML viewer output + browser launch
+    completions_command.dart      # Bash/Zsh/Fish completion scripts
     version.g.dart                # generated from pubspec.yaml
 tool/
   version/generate_version.dart   # single-source CLI version + --check
@@ -114,6 +115,7 @@ lib/
     visual_primitives.dart         # pure-Dart page/frame geometry + visual commands
     visual_document.dart           # DIR -> VisualDocument projection
     visual_renderer.dart           # SVG visual renderer
+    document_diff.dart             # pure-Dart line diff + side-by-side row model
     document_page_adapter.dart     # pure-Dart HTML page adapter (semantic + visual)
     stanag/
       stanag_parser.dart           # family dispatcher + StanagSubParser contract
@@ -254,6 +256,10 @@ See `CONTINUATION.md` for the remaining backlog and known limitations.
   file paths/cache directories/browser launch in `bin/src/view_command.dart`.
   Viewer output must stay self-contained and degrade to a notice when a codec or
   feature is unsupported.
+- New adapter behavior → keep `DocumentPageAdapter` framework-free with embedded
+  CSS/vanilla JS only, no CDN or runtime dependency. Treat attachment bytes/text
+  as optional payloads, cap inline data URIs, and keep semantic content usable
+  without JavaScript.
 - Version changes → update `pubspec.yaml`, `parserImplementationVersion`, the
   generated CLI version (`dart run tool/version/generate_version.dart`), the
   changelog, and `CONTINUATION.md`.

@@ -30,9 +30,19 @@ covered by tests:
   Markdown and CSV/TSV are hint-gated and never claim arbitrary text. Hint-only
   matches are reported with high confidence and `hint-match` evidence.
 - **CLI:** `panthalassa` provides `detect`, `parse`, `render`, `view`, `batch`,
-  `digest`, `formats`, and `version`, with JSON/text modes, stdin support, hints,
-  strict limits, and per-file batch output. CLI code is confined to `bin/`;
-  `lib/` remains pure Dart and web-safe.
+  `digest`, `formats`, `version`, and `completions`, with JSON/text modes, stdin
+  support, hints, strict limits, per-file batch output, and Bash/Zsh/Fish
+  completion scripts. CLI code is confined to `bin/`; `lib/` remains pure Dart
+  and web-safe.
+- **Renderers:** `DocumentIr` plus `VisualDocument` feed pure-Dart text,
+  Markdown, escaped-HTML, SVG, and page adapters. `DocumentPageAdapter` emits one
+  self-contained HTML page with light/dark/system themes, a persistent
+  collapsible outline, live find-in-page across text and SVG, language-aware
+  syntax highlighting, a zoom/pan lightbox with SVG/PNG export, collapsible
+  sections, attachment previews, side-by-side `DocumentDiff`, and print styles.
+  It uses embedded CSS and vanilla JS only — no CDN, framework, or runtime
+  dependency. Attachment previews/export require parsers to retain bytes or
+  text, and inline payloads are capped at 8 MiB.
 - **Viewer:** `panthalassa view` generates a self-contained HTML document and
   opens it in the default browser. CSV/TSV renders as a sticky, filterable table
   (5,000 rows by default, `--all-rows` to override); DICOM renders decoded
@@ -55,6 +65,8 @@ These are deliberate scope boundaries, not regressions:
 - **PDF rendering** is a display-list foundation, not pixel-faithful
   rasterization. Glyph outlines, arbitrary transforms, clipping, shadings,
   masks, blend modes, and DCT/JPX/CCITT/JBIG2 image codecs are not implemented.
+  The HTML page adapter's SVG/PNG export uses the browser's SVG serializer and
+  canvas, so it inherits these display-list limits.
 - **DICOM pixel rendering** covers uncompressed implicit/explicit LE, explicit
   BE, deflated, RLE, and JPEG-baseline data, with a 2048px output cap and a
   16M-input-pixel guard. JPEG-LS, JPEG 2000, JPEG lossless, PALETTE COLOR, and
@@ -91,8 +103,8 @@ Ordered by value for the vault pipeline:
    generated-HTML browser handoff.
 3. **Standards depth:** exhaustive DICOM PS3.6 dictionary generation, fuller
    STANAG/NITF bodies, ISO 20022 ASN.1, and additional OOXML/ODF edge cases.
-4. **CLI polish:** shell completions, a `--watch` batch mode, and richer
-   render-time page selection (the current command intentionally stays small).
+4. **CLI polish:** a `--watch` batch mode and richer render-time page selection
+   (the current command intentionally stays small).
 5. **Conformance corpus:** expand the environment-gated real-file harness with
    externally generated PDFs, DICOM studies, OOXML, EPUB, and EML fixtures.
 6. **Performance:** re-run `benchmark/parse_benchmark.dart` on large PDFs,

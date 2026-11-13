@@ -32,7 +32,7 @@ package pure Dart, web-safe, and honest about unsupported format features.
 | PDF image codec decode | Not started | DCT, JPX, CCITT, JBIG2 and color spaces decode or fail closed with diagnostics. | Future image fixture suite. |
 | DICOM pixel decode | Complete initial (viewer path) | Uncompressed implicit/explicit LE, explicit BE, deflated, RLE, and JPEG-baseline frames decode to PNG with rescale/windowing; unsupported codecs fail closed with notices. | `lib/src/parsers/dicom/dicom_image.dart`; `test/dicom_image_test.dart`; CLI `view`. |
 | NITF pixel/tile decode | Not started | NITF image segments decode/lazily tile with safe resource limits. | Future NITF imagery fixtures. |
-| Pure-Dart HTML page adapter | Complete | `DocumentPageAdapter` combines `DocumentIr` (semantic) and `VisualDocument` (faithful SVG pages) into one self-contained HTML page, framework-free and web-safe. | `lib/src/render/document_page_adapter.dart`; `test/document_page_adapter_test.dart`. |
+| Pure-Dart HTML page adapter | Complete | `DocumentPageAdapter` combines `DocumentIr` (semantic) and `VisualDocument` (faithful SVG pages) into one self-contained HTML page: themes, persistent outline, find-in-page, syntax highlighting, zoom/pan lightbox with SVG/PNG export, collapsible sections, attachment previews, side-by-side `DocumentDiff`, and print styles. Framework-free and web-safe with embedded CSS/vanilla JS only. | `lib/src/render/document_page_adapter.dart`; `lib/src/render/document_diff.dart`; `test/document_page_adapter_test.dart`; `test/document_diff_test.dart`. |
 | Flutter canvas adapter | Not started | Separate Flutter layer maps display-list commands to `CustomPainter`, selection/search overlay, and lazy pages. Consumes the same `DocumentIr`/`VisualDocument` model. | Flutter widget tests/screenshots. |
 | Jaspr visual adapter | Not started | Separate Jaspr/web layer consumes SVG or typed display-list components safely. Consumes the same `DocumentIr`/`VisualDocument` model. | Jaspr smoke test. |
 
@@ -41,8 +41,9 @@ package pure Dart, web-safe, and honest about unsupported format features.
 The engine can now emit a faithful-rendering substrate: page geometry plus a
 bounded display list. PDF pages with simple positioned text can render to SVG.
 Image-bearing binary formats expose placeholders when dimensions are known. The
-DICOM viewer has a separate PNG decode path for supported pixel syntaxes; it is
-not yet projected into the shared display list.
+self-contained HTML adapter consumes both models and can export each visual page
+as SVG or PNG in the browser. The DICOM viewer has a separate PNG decode path for
+supported pixel syntaxes; it is not yet projected into the shared display list.
 
 This is not yet a full pixel rasterizer. Unsupported visual PDF operators and
 undecoded image codecs must remain visible in diagnostics until implemented and

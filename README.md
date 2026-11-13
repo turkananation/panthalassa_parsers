@@ -82,6 +82,30 @@ final result = registry.parse(
 );
 ```
 
+## Rendering
+
+`DocumentIr` is the format-agnostic semantic model; `VisualDocument` carries
+faithful display-list pages where a parser exposes them. Renderers are
+framework-free, so server, web, Flutter, and Jaspr callers can share the model:
+
+```dart
+final ir = DocumentIr.fromParseResult(result);
+final page = const DocumentPageAdapter().render(
+  ir: ir,
+  visual: ir.toVisualDocument(),
+  compareWith: previousIr, // optional side-by-side semantic diff
+);
+```
+
+`DocumentPageAdapter` emits one self-contained HTML page with embedded CSS and
+vanilla JavaScript: light/dark/system themes, a collapsible outline, live
+find-in-page across text and SVG, language-aware code highlighting, a
+zoom/pan lightbox, SVG/PNG page export, collapsible sections, attachment
+previews, a side-by-side diff, and print/Save-as-PDF styles. It has no CDN,
+framework, or runtime dependency and opens from `file://`. `TextDocumentRenderer`,
+`MarkdownDocumentRenderer`, `HtmlDocumentRenderer`, and `SvgVisualRenderer`
+cover plain-text, Markdown, escaped-HTML, and SVG export.
+
 ## Command-line interface
 
 The package ships `panthalassa`, a styled, script-friendly CLI built on the same
@@ -107,6 +131,7 @@ dart run bin/panthalassa.dart --help
 | `digest <file>...` | SHA-256/384/512 content addresses, `--algo`, `--short`, and `--expect` verification. |
 | `formats [query]` | Supported formats, capabilities, detection hints, and parser families. |
 | `version` | CLI/package/parser/schema versions. |
+| `completions` | Bash, Zsh, or Fish completion script (`--shell`). |
 
 Examples:
 
@@ -197,9 +222,12 @@ conservative text/rectangle/image-placeholder commands; NITF and DICOM metadata
 project to image/frame placeholders when dimensions are known. The separate
 `view` pipeline decodes DICOM frames to PNG for its self-contained viewer rather
 than routing them through the display-list layer. `SvgVisualRenderer` provides a
-framework-free preview/export path, and Flutter/Jaspr adapters should consume the
-same semantic and visual models without adding framework dependencies to this
-core package.
+framework-free preview/export path. `DocumentPageAdapter` combines both models
+into an interactive, self-contained HTML page; attachment previews and export
+are limited to payloads that parsers actually retained, so ask the parser for
+attachment bytes/text explicitly. Flutter/Jaspr adapters should consume the same
+semantic and visual models without adding framework dependencies to this core
+package.
 
 Full pixel-faithful PDF rasterization remains a larger track: glyph outlines,
 transforms, clipping, shadings, masks, blend modes, and image codecs are not yet

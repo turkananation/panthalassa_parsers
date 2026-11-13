@@ -20,8 +20,10 @@ const _manifestName = 'conformance_manifest.json';
 
 Future<void> main(List<String> args) async {
   if (args.isEmpty) {
-    stderr.writeln('Usage: dart run tool/conformance_generate.dart <dir> '
-        '[--out <file>]');
+    stderr.writeln(
+      'Usage: dart run tool/conformance_generate.dart <dir> '
+      '[--out <file>]',
+    );
     exitCode = 64;
     return;
   }
@@ -48,9 +50,8 @@ Future<void> main(List<String> args) async {
   final rootPath = root.absolute.path.endsWith('/')
       ? root.absolute.path
       : '${root.absolute.path}/';
-  String relativePath(String path) => path.startsWith(rootPath)
-      ? path.substring(rootPath.length)
-      : path;
+  String relativePath(String path) =>
+      path.startsWith(rootPath) ? path.substring(rootPath.length) : path;
 
   for (final file in files) {
     final bytes = await file.readAsBytes();
@@ -76,6 +77,8 @@ Future<void> main(List<String> args) async {
   };
   final file = File(outPath);
   await file.parent.create(recursive: true);
-  await file.writeAsString(const JsonEncoder.withIndent('  ').convert(manifest));
+  await file.writeAsString(
+    const JsonEncoder.withIndent('  ').convert(manifest),
+  );
   stdout.writeln('Wrote $outPath ($cases.length cases).');
 }

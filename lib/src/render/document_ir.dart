@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:meta/meta.dart';
 
 import '../core/document_format.dart';
@@ -53,7 +55,7 @@ final class DocumentIr extends DocNode {
       sourceFormat: result.format,
       metadata: result.metadata,
       body: body,
-      attachments: _attachments(result.metadata),
+      attachments: _attachments(result),
       contentId: result.documentId,
     );
   }
@@ -163,10 +165,31 @@ enum TextMark { bold, italic, underline, code }
 
 @immutable
 final class Attachment {
-  const Attachment({this.name, this.mediaType, this.size});
+  const Attachment({
+    this.name,
+    this.mediaType,
+    this.size,
+    this.bytes,
+    this.text,
+    this.relationship,
+    this.encrypted = false,
+  });
   final String? name;
   final String? mediaType;
   final int? size;
+
+  /// Raw payload, retained only when the caller opted into attachment bytes.
+  final Uint8List? bytes;
+
+  /// Extracted text for text-bearing attachments.
+  final String? text;
+
+  /// Container-specific relationship (for example a PDF `/AFRelationship`).
+  final String? relationship;
+
+  final bool encrypted;
+
+  bool get hasBytes => bytes != null;
 }
 
 @immutable
@@ -449,14 +472,29 @@ VisualCoordinateSpace _coordinateSpace(Object? value) => value == 'screen'
     ? VisualCoordinateSpace.screen
     : VisualCoordinateSpace.pdfUserSpace;
 
-List<Attachment> _attachments(Map<String, Object?> metadata) {
-  final files = metadata['embeddedFiles'];
+List<Attachment> _attachments(ParseResult result) {
+  if (result.attachments.isNotEmpty) {
+    return [
+      for (final file in result.attachments)
+        Attachment(
+          name: file.name,
+          mediaType: file.mediaType,
+          size: file.size,
+          bytes: file.bytes,
+          text: file.text,
+          relationship: file.relationship,
+          encrypted: file.encrypted,
+        ),
+    ];
+  }
+  final files = result.metadata['embeddedFiles'];
   if (files is! Iterable) return const [];
   return [
     for (final file in files)
       if (file is Map)
         Attachment(
           name: file['name'] as String?,
+          mediaType: file['mediaType'] as String?,
           size: file['size'] is int ? file['size'] as int : null,
         ),
   ];

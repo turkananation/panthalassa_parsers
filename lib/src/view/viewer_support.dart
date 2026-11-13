@@ -10,12 +10,12 @@ import 'viewer_document.dart';
 /// All builders use the same warning ceiling and label format so the warning
 /// surface is consistent across formats.
 List<ViewerNotice> viewerWarnings(ParseResult result) => [
-      for (final warning in result.warnings.take(8))
-        ViewerNotice(
-          '${warning.code}: ${warning.message}',
-          level: ViewerNoticeLevel.warning,
-        ),
-    ];
+  for (final warning in result.warnings.take(8))
+    ViewerNotice(
+      '${warning.code}: ${warning.message}',
+      level: ViewerNoticeLevel.warning,
+    ),
+];
 
 /// Title shared by every viewer: the explicit option title or the source
 /// filename basename.
@@ -24,9 +24,9 @@ String viewerTitle(ViewerRequest request) =>
 
 /// Base facts shown by every viewer: size and document id.
 Map<String, String> viewerBaseFacts(ViewerRequest request) => {
-      'Size': formatViewerBytes(request.bytes.length),
-      'Document ID': request.result.documentId,
-    };
+  'Size': formatViewerBytes(request.bytes.length),
+  'Document ID': request.result.documentId,
+};
 
 /// Human byte count with binary units.
 String formatViewerBytes(int bytes) {
