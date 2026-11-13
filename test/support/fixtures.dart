@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:image/image.dart' as img;
 
 /// Test fixture builders that synthesise minimal-but-valid documents, so the
 /// suite has no binary asset dependencies and every byte is auditable.
@@ -45,6 +47,288 @@ Uint8List buildMinimalDicom() {
   b.add(elem(0x0008, 0x0060, 'CS', ascii.encode('CT'))); // Modality
   b.add(elem(0x0010, 0x0010, 'PN', ascii.encode('DOE^JANE'))); // PatientName
   return b.toBytes();
+}
+
+List<int> _dicomUi(String value) {
+  final bytes = ascii.encode(value).toList();
+  if (bytes.length.isOdd) bytes.add(0x00);
+  return bytes;
+}
+
+List<int> _dicomString(String value) {
+  final bytes = ascii.encode(value).toList();
+  if (bytes.length.isOdd) bytes.add(0x20);
+  return bytes;
+}
+
+List<int> _dicomElement(int group, int element, String vr, List<int> value) {
+  assert(value.length.isEven, 'DICOM values must be even length');
+  return [
+    ..._le16(group),
+    ..._le16(element),
+    ...ascii.encode(vr),
+    ..._le16(value.length),
+    ...value,
+  ];
+}
+
+List<int> _dicomBe16(int value) => [(value >> 8) & 0xFF, value & 0xFF];
+
+List<int> _dicomBe32(int value) => [
+  (value >> 24) & 0xFF,
+  (value >> 16) & 0xFF,
+  (value >> 8) & 0xFF,
+  value & 0xFF,
+];
+
+const Set<String> _longDicomVrs = {
+  'OB',
+  'OD',
+  'OF',
+  'OL',
+  'OV',
+  'OW',
+  'SQ',
+  'UC',
+  'UR',
+  'UT',
+  'UN',
+};
+
+List<int> _dicomSyntaxElement(
+  int group,
+  int element,
+  String vr,
+  List<int> value, {
+  required bool implicit,
+  required Endian endian,
+}) {
+  assert(value.length.isEven, 'DICOM values must be even length');
+  final u16 = endian == Endian.little ? _le16 : _dicomBe16;
+  final u32 = endian == Endian.little ? _le32 : _dicomBe32;
+  final tag = [...u16(group), ...u16(element)];
+  if (implicit) return [...tag, ...u32(value.length), ...value];
+  if (_longDicomVrs.contains(vr)) {
+    return [...tag, ...ascii.encode(vr), 0, 0, ...u32(value.length), ...value];
+  }
+  return [...tag, ...ascii.encode(vr), ...u16(value.length), ...value];
+}
+
+Uint8List _dicomPart10({
+  required String transferSyntax,
+  required List<int> dataset,
+}) {
+  final out = BytesBuilder()
+    ..add(Uint8List(128))
+    ..add(ascii.encode('DICM'))
+    ..add(_dicomElement(0x0002, 0x0010, 'UI', _dicomUi(transferSyntax)))
+    ..add(dataset);
+  return out.toBytes();
+}
+
+/// Builds a native (uncompressed) DICOM image.
+///
+/// Defaults to explicit VR little endian. Set [implicitVr], [endian], or
+/// [deflated] to exercise the other uncompressed transfer syntaxes. Pixel bytes
+/// are supplied verbatim so tests can cover 8-bit, 16-bit, signed, RGB, and
+/// planar layouts without an external file.
+Uint8List buildDicomImage({
+  required int rows,
+  required int columns,
+  required List<int> pixelBytes,
+  int bitsAllocated = 8,
+  int? bitsStored,
+  int? highBit,
+  int pixelRepresentation = 0,
+  int samplesPerPixel = 1,
+  String photometricInterpretation = 'MONOCHROME2',
+  int planarConfiguration = 0,
+  int numberOfFrames = 1,
+  double? windowCenter,
+  double? windowWidth,
+  double? rescaleSlope,
+  double? rescaleIntercept,
+  String modality = 'CT',
+  String patientName = 'DOE^JANE',
+  String transferSyntax = '1.2.840.10008.1.2.1',
+  bool implicitVr = false,
+  Endian endian = Endian.little,
+  bool deflated = false,
+  bool zlibWrapped = false,
+}) {
+  final stored = bitsStored ?? bitsAllocated;
+  final high = highBit ?? stored - 1;
+  final pixels = [...pixelBytes];
+  if (pixels.length.isOdd) pixels.add(0);
+  List<int> element(int group, int element, String vr, List<int> value) =>
+      _dicomSyntaxElement(
+        group,
+        element,
+        vr,
+        value,
+        implicit: implicitVr,
+        endian: endian,
+      );
+  List<int> us(int value) =>
+      endian == Endian.big ? _dicomBe16(value) : _le16(value);
+  final dataset = <int>[
+    ...element(0x0008, 0x0060, 'CS', _dicomString(modality)),
+    ...element(0x0010, 0x0010, 'PN', _dicomString(patientName)),
+    ...element(0x0028, 0x0002, 'US', us(samplesPerPixel)),
+    ...element(0x0028, 0x0004, 'CS', _dicomString(photometricInterpretation)),
+    ...element(0x0028, 0x0006, 'US', us(planarConfiguration)),
+    ...element(0x0028, 0x0008, 'IS', _dicomString('$numberOfFrames')),
+    ...element(0x0028, 0x0010, 'US', us(rows)),
+    ...element(0x0028, 0x0011, 'US', us(columns)),
+    ...element(0x0028, 0x0100, 'US', us(bitsAllocated)),
+    ...element(0x0028, 0x0101, 'US', us(stored)),
+    ...element(0x0028, 0x0102, 'US', us(high)),
+    ...element(0x0028, 0x0103, 'US', us(pixelRepresentation)),
+    if (windowCenter != null)
+      ...element(0x0028, 0x1050, 'DS', _dicomString('$windowCenter')),
+    if (windowWidth != null)
+      ...element(0x0028, 0x1051, 'DS', _dicomString('$windowWidth')),
+    if (rescaleIntercept != null)
+      ...element(0x0028, 0x1052, 'DS', _dicomString('$rescaleIntercept')),
+    if (rescaleSlope != null)
+      ...element(0x0028, 0x1053, 'DS', _dicomString('$rescaleSlope')),
+    ...element(0x7FE0, 0x0010, 'OW', pixels),
+  ];
+  final syntax = implicitVr
+      ? '1.2.840.10008.1.2'
+      : endian == Endian.big
+      ? '1.2.840.10008.1.2.2'
+      : deflated
+      ? '1.2.840.10008.1.2.1.99'
+      : transferSyntax;
+  final zlib = const ZLibEncoder().encode(dataset);
+  final body = !deflated
+      ? dataset
+      : zlibWrapped
+      ? zlib
+      // PS3.5 requires raw deflate: strip the RFC 1950 header and Adler-32.
+      : zlib.sublist(2, zlib.length - 4);
+  return _dicomPart10(transferSyntax: syntax, dataset: body);
+}
+
+/// Builds an encapsulated DICOM image with a single frame fragment.
+Uint8List buildEncapsulatedDicomImage({
+  required int rows,
+  required int columns,
+  required List<int> frame,
+  required String transferSyntax,
+  int samplesPerPixel = 1,
+  String photometricInterpretation = 'MONOCHROME2',
+  int bitsAllocated = 8,
+  int? bitsStored,
+  int? highBit,
+}) {
+  final stored = bitsStored ?? bitsAllocated;
+  final high = highBit ?? stored - 1;
+  final fragment = [...frame];
+  if (fragment.length.isOdd) fragment.add(0);
+  final dataset = <int>[
+    ..._dicomElement(0x0008, 0x0060, 'CS', _dicomString('CT')),
+    ..._dicomElement(0x0010, 0x0010, 'PN', _dicomString('DOE^JANE')),
+    ..._dicomElement(0x0028, 0x0002, 'US', _le16(samplesPerPixel)),
+    ..._dicomElement(
+      0x0028,
+      0x0004,
+      'CS',
+      _dicomString(photometricInterpretation),
+    ),
+    ..._dicomElement(0x0028, 0x0008, 'IS', _dicomString('1')),
+    ..._dicomElement(0x0028, 0x0010, 'US', _le16(rows)),
+    ..._dicomElement(0x0028, 0x0011, 'US', _le16(columns)),
+    ..._dicomElement(0x0028, 0x0100, 'US', _le16(bitsAllocated)),
+    ..._dicomElement(0x0028, 0x0101, 'US', _le16(stored)),
+    ..._dicomElement(0x0028, 0x0102, 'US', _le16(high)),
+    ..._dicomElement(0x0028, 0x0103, 'US', _le16(0)),
+    // Encapsulated Pixel Data.
+    ..._le16(0x7FE0),
+    ..._le16(0x0010),
+    ...ascii.encode('OB'),
+    0,
+    0,
+    ..._le32(0xFFFFFFFF),
+    // Empty basic offset table, single frame fragment, sequence delimiter.
+    ..._le16(0xFFFE),
+    ..._le16(0xE000),
+    ..._le32(0),
+    ..._le16(0xFFFE),
+    ..._le16(0xE000),
+    ..._le32(fragment.length),
+    ...fragment,
+    ..._le16(0xFFFE),
+    ..._le16(0xE0DD),
+    ..._le32(0),
+  ];
+  return _dicomPart10(transferSyntax: transferSyntax, dataset: dataset);
+}
+
+/// Builds an RLE Lossless DICOM frame. The payload is a literal PackBits run,
+/// which keeps the fixture readable while exercising the real RLE path.
+Uint8List buildDicomRleImage({
+  int rows = 2,
+  int columns = 2,
+  List<int> pixels = const [0, 85, 170, 255],
+}) {
+  final header = List<int>.filled(64, 0);
+  void putOffset(int index, int value) {
+    final bytes = _le32(value);
+    header.setRange(index * 4, index * 4 + 4, bytes);
+  }
+
+  putOffset(0, 64);
+  final encoded = <int>[pixels.length - 1, ...pixels];
+  final frame = <int>[...header, ...encoded];
+  if (frame.length.isOdd) frame.add(0);
+  return buildEncapsulatedDicomImage(
+    rows: rows,
+    columns: columns,
+    frame: frame,
+    transferSyntax: '1.2.840.10008.1.2.5',
+  );
+}
+
+/// Builds a JPEG Baseline DICOM frame from a small generated RGB image.
+Uint8List buildDicomJpegImage({
+  int rows = 2,
+  int columns = 2,
+  List<int> rgba = const [
+    255,
+    0,
+    0,
+    255,
+    0,
+    255,
+    0,
+    255,
+    0,
+    0,
+    255,
+    255,
+    255,
+    255,
+    255,
+    255,
+  ],
+}) {
+  final image = img.Image.fromBytes(
+    width: columns,
+    height: rows,
+    bytes: Uint8List.fromList(rgba).buffer,
+    numChannels: 4,
+  );
+  final jpeg = img.encodeJpg(image);
+  return buildEncapsulatedDicomImage(
+    rows: rows,
+    columns: columns,
+    frame: jpeg,
+    transferSyntax: '1.2.840.10008.1.2.4.50',
+    samplesPerPixel: 3,
+    photometricInterpretation: 'YBR_FULL_422',
+  );
 }
 
 /// Builds a DICOM Part 10 file with a multi-valued string and an
@@ -98,6 +382,193 @@ Uint8List buildDicomWithSequenceAndMultiValues() {
 
   return b.toBytes();
 }
+
+/// Builds a minimal explicit-VR LE DICOM Structured Report with a single TEXT
+/// content item and no Pixel Data.
+Uint8List buildDicomStructuredReport({String finding = 'No acute finding'}) {
+  List<int> tag(int group, int element) => [..._le16(group), ..._le16(element)];
+
+  List<int> item(List<int> content) => [
+    ...tag(0xFFFE, 0xE000),
+    ..._le32(content.length),
+    ...content,
+  ];
+
+  List<int> sequence(int group, int element, List<List<int>> items) {
+    final content = [for (final itemContent in items) ...item(itemContent)];
+    return [
+      ...tag(group, element),
+      ...ascii.encode('SQ'),
+      0,
+      0,
+      ..._le32(content.length),
+      ...content,
+    ];
+  }
+
+  List<int> element(int group, int element, String vr, List<int> value) =>
+      _dicomSyntaxElement(
+        group,
+        element,
+        vr,
+        value,
+        implicit: false,
+        endian: Endian.little,
+      );
+
+  final conceptName = sequence(0x0040, 0xA043, [
+    [
+      ...element(0x0008, 0x0100, 'SH', _dicomString('121071')),
+      ...element(0x0008, 0x0102, 'SH', _dicomString('DCM')),
+      ...element(0x0008, 0x0104, 'LO', _dicomString('Finding')),
+    ],
+  ]);
+  final contentItem = [
+    ...element(0x0040, 0xA010, 'CS', _dicomString('CONTAINS')),
+    ...element(0x0040, 0xA040, 'CS', _dicomString('TEXT')),
+    ...conceptName,
+    ...element(0x0040, 0xA160, 'UT', _dicomString(finding)),
+  ];
+  final dataset = [
+    ...element(0x0008, 0x0060, 'CS', _dicomString('SR')),
+    ...sequence(0x0040, 0xA730, [contentItem]),
+  ];
+  return _dicomPart10(transferSyntax: '1.2.840.10008.1.2.1', dataset: dataset);
+}
+
+/// Builds a valid 4×3 PNG for viewer preview tests.
+Uint8List buildViewerPng({int width = 4, int height = 3}) {
+  final image = img.Image(width: width, height: height);
+  img.fill(image, color: img.ColorRgb8(0, 128, 255));
+  return img.encodePng(image);
+}
+
+/// Builds a minimal two-sheet XLSX workbook with header rows.
+Uint8List buildSpreadsheetXlsx() {
+  final archive = Archive();
+  const contentTypes =
+      '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>''';
+  const rootRels = '''<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>''';
+  const workbookRels = '''<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+</Relationships>''';
+  const workbookXml = '''<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Budget" sheetId="1" r:id="rId1"/>
+    <sheet name="Notes" sheetId="2" r:id="rId2"/>
+  </sheets>
+</workbook>''';
+  const sheet1Xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1">
+      <c r="A1" t="str"><v>Item</v></c>
+      <c r="B1" t="str"><v>Amount</v></c>
+    </row>
+    <row r="2">
+      <c r="A2" t="str"><v>Alpha</v></c>
+      <c r="B2"><v>42</v></c>
+    </row>
+  </sheetData>
+</worksheet>''';
+  const sheet2Xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1">
+      <c r="A1" t="str"><v>Note</v></c>
+    </row>
+    <row r="2">
+      <c r="A2" t="str"><v>Hello</v></c>
+    </row>
+  </sheetData>
+</worksheet>''';
+
+  archive.addFile(ArchiveFile.string('[Content_Types].xml', contentTypes));
+  archive.addFile(ArchiveFile.string('_rels/.rels', rootRels));
+  archive.addFile(ArchiveFile.string('xl/workbook.xml', workbookXml));
+  archive.addFile(
+    ArchiveFile.string('xl/_rels/workbook.xml.rels', workbookRels),
+  );
+  archive.addFile(ArchiveFile.string('xl/worksheets/sheet1.xml', sheet1Xml));
+  archive.addFile(ArchiveFile.string('xl/worksheets/sheet2.xml', sheet2Xml));
+  return Uint8List.fromList(ZipEncoder().encodeBytes(archive) as List<int>);
+}
+
+/// Builds a minimal one-sheet ODS spreadsheet.
+Uint8List buildSpreadsheetOds() {
+  final archive = Archive();
+  final mime = ascii.encode('application/vnd.oasis.opendocument.spreadsheet');
+  archive.addFile(ArchiveFile.noCompress('mimetype', mime.length, mime));
+
+  final content = utf8.encode(
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<office:document-content '
+    'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+    'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
+    'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">'
+    '<office:body><office:spreadsheet>'
+    '<table:table table:name="Budget">'
+    '<table:table-row>'
+    '<table:table-cell><text:p>Item</text:p></table:table-cell>'
+    '<table:table-cell><text:p>Amount</text:p></table:table-cell>'
+    '</table:table-row>'
+    '<table:table-row>'
+    '<table:table-cell><text:p>Alpha</text:p></table:table-cell>'
+    '<table:table-cell><text:p>42</text:p></table:table-cell>'
+    '</table:table-row>'
+    '</table:table>'
+    '</office:spreadsheet></office:body>'
+    '</office:document-content>',
+  );
+  archive.addFile(ArchiveFile('content.xml', content.length, content));
+  return Uint8List.fromList(ZipEncoder().encode(archive));
+}
+
+/// Builds an RFC 822 message with a plain-text body and a base64 attachment.
+Uint8List buildEmlWithAttachment({
+  String subject = 'Viewer message',
+  String body = 'Hello from the viewer.',
+}) => Uint8List.fromList(
+  utf8.encode(
+    'From: sender@example.com\n'
+    'To: recipient@example.com\n'
+    'Subject: $subject\n'
+    'Date: Wed, 11 Nov 2026 10:00:00 +0000\n'
+    'Message-ID: <viewer@example.com>\n'
+    'MIME-Version: 1.0\n'
+    'Content-Type: multipart/mixed; boundary="viewer-boundary"\n'
+    '\n'
+    '--viewer-boundary\n'
+    'Content-Type: text/plain; charset=utf-8\n'
+    '\n'
+    '$body\n'
+    '--viewer-boundary\n'
+    'Content-Type: application/pdf; name="report.pdf"\n'
+    'Content-Disposition: attachment; filename="report.pdf"\n'
+    'Content-Transfer-Encoding: base64\n'
+    '\n'
+    'JVBERi0xLjQK\n'
+    '--viewer-boundary--\n',
+  ),
+);
+
+/// Reads a real externally generated encrypted PDF fixture.
+Uint8List buildEncryptedPdf({String name = 'enc_rc4_40.pdf'}) =>
+    File('test/fixtures/$name').readAsBytesSync();
 
 /// Builds a minimal NITF 2.1 file with image, graphic, text, DES, and RES
 /// segments so segment-table and body walking can be tested without assets.
@@ -279,6 +750,63 @@ Uint8List buildSimplePdf({
     '/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n',
   );
   put('4 0 obj\n<< /Length ${streamBytes.length}$filterEntry >>\nstream\n');
+  out.add(streamBytes);
+  put('\nendstream\nendobj\n');
+  put(
+    '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+  );
+  put('trailer\n<< /Root 1 0 R >>\n%%EOF');
+  return out.toBytes();
+}
+
+/// PDF using `cm` to scale by 2 and translate by (100, 100) before drawing text.
+/// Exercises the graphics-state CTM path in `PdfVisualExtractor`.
+Uint8List buildTransformedPdf({String showText = 'Scaled Text'}) {
+  final rawContent = ascii.encode(
+    'q 2 0 0 2 100 100 cm BT /F1 24 Tf 0 0 Td ($showText) Tj ET Q',
+  );
+  final streamBytes = rawContent;
+
+  final out = BytesBuilder();
+  void put(String s) => out.add(latin1.encode(s));
+
+  put('%PDF-1.7\n');
+  put('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  put('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+  put(
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] '
+    '/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n',
+  );
+  put('4 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n');
+  out.add(streamBytes);
+  put('\nendstream\nendobj\n');
+  put(
+    '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+  );
+  put('trailer\n<< /Root 1 0 R >>\n%%EOF');
+  return out.toBytes();
+}
+
+/// PDF using `q`/`Q` to save/restore graphics state: text inside the block is
+/// scaled by `cm`, text after `Q` is at the default transform.
+Uint8List buildSavedStatePdf({String inner = 'Inner', String outer = 'Outer'}) {
+  final rawContent = ascii.encode(
+    'q 3 0 0 3 50 50 cm BT /F1 18 Tf 0 0 Td ($inner) Tj ET Q '
+    'BT /F1 18 Tf 72 700 Td ($outer) Tj ET',
+  );
+  final streamBytes = rawContent;
+
+  final out = BytesBuilder();
+  void put(String s) => out.add(latin1.encode(s));
+
+  put('%PDF-1.7\n');
+  put('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  put('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+  put(
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] '
+    '/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n',
+  );
+  put('4 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n');
   out.add(streamBytes);
   put('\nendstream\nendobj\n');
   put(

@@ -32,6 +32,7 @@ export 'src/core/structured_artifacts.dart';
 
 export 'src/parsers/cda_parser.dart';
 export 'src/parsers/csv_parser.dart';
+export 'src/parsers/dicom/dicom_image.dart';
 export 'src/parsers/dicom_json_parser.dart';
 export 'src/parsers/dicom_parser.dart';
 export 'src/parsers/dicom_sr.dart';
@@ -75,3 +76,18 @@ export 'src/render/document_renderer.dart';
 export 'src/render/visual_document.dart';
 export 'src/render/visual_primitives.dart';
 export 'src/render/visual_renderer.dart';
+export 'src/render/document_diff.dart';
+export 'src/render/document_page_adapter.dart';
+
+export 'src/view/csv_view_builder.dart';
+export 'src/view/dicom_view_builder.dart';
+export 'src/view/document_view_builder.dart';
+export 'src/view/email_view_builder.dart';
+export 'src/view/image_view_builder.dart';
+export 'src/view/pdf_view_builder.dart';
+export 'src/view/spreadsheet_view_builder.dart';
+export 'src/view/structured_source_view_builder.dart';
+export 'src/view/viewer_document.dart';
+export 'src/view/viewer_html.dart';
+export 'src/view/viewer_registry.dart';
+export 'src/view/viewer_support.dart';

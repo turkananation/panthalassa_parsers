@@ -1,6 +1,6 @@
 # Continuation — panthalassa_parsers
 
-Current version: **0.5.1**  
+Current version: **0.5.2**  
 Last updated: **2026-11-11**
 
 This file is the resume point for the parser/document-engine work. Read
@@ -9,7 +9,7 @@ surface.
 
 ## Current state
 
-The audit remediation and feature roadmap through v0.5.1 are implemented and
+The audit remediation and feature roadmap through v0.5.2 are implemented and
 covered by tests:
 
 - **Content addressing:** SHA-256, SHA-384, and SHA-512 are computed in one
@@ -29,10 +29,31 @@ covered by tests:
 - **Detection:** strong binary magic runs before permissive text heuristics.
   Markdown and CSV/TSV are hint-gated and never claim arbitrary text. Hint-only
   matches are reported with high confidence and `hint-match` evidence.
-- **CLI:** `panthalassa` provides `detect`, `parse`, `render`, `batch`, `digest`,
-  `formats`, and `version`, with JSON/text modes, stdin support, hints, strict
-  limits, and per-file batch output. CLI code is confined to `bin/`; `lib/`
-  remains pure Dart and web-safe.
+- **CLI:** `panthalassa` provides `detect`, `parse`, `render`, `view`, `batch`,
+  `digest`, `formats`, `version`, and `completions`, with JSON/text modes, stdin
+  support, hints, strict limits, per-file batch output, and Bash/Zsh/Fish
+  completion scripts. CLI code is confined to `bin/`; `lib/` remains pure Dart
+  and web-safe.
+- **Renderers:** `DocumentIr` plus `VisualDocument` feed pure-Dart text,
+  Markdown, escaped-HTML, SVG, and page adapters. `DocumentPageAdapter` emits one
+  self-contained HTML page with light/dark/system themes, a persistent
+  collapsible outline, live find-in-page across text and SVG, language-aware
+  syntax highlighting, a zoom/pan lightbox with SVG/PNG export, collapsible
+  sections, attachment previews, side-by-side `DocumentDiff`, and print styles.
+  It uses embedded CSS and vanilla JS only — no CDN, framework, or runtime
+  dependency. Attachment previews/export require parsers to retain bytes or
+  text, and inline payloads are capped at 8 MiB.
+- **Viewer:** `panthalassa view` generates a self-contained HTML document and
+  opens it in the default browser. CSV/TSV renders as a sticky, filterable table
+  (5,000 rows by default, `--all-rows` to override); DICOM renders decoded
+  frames with window/level and support for uncompressed, RLE, and JPEG-baseline
+  data via `DicomParser.readImage` + `DicomPixelDecoder`. Dedicated builders
+  handle XLSX/ODS spreadsheets, raster image preview (JPEG/PNG/GIF/WebP/SVG),
+  EML email, PDF browser-native embedding, and structured JSON/XML/NIEM source.
+  DICOM appends Structured Report text/tables for no-pixel/SR instances. Other
+  formats fall back to semantic HTML. Viewer selection is extensible through
+  `ViewBuilder`/`ViewerRegistry`; `--out`, `--print-path`, `--raw`, `--json`,
+  `--no-open`, and cache-root content addressing are supported.
 - **Verification:** `dart analyze`, `dart test`, the CLI smoke commands, and
   `dart compile js` on `tool/web_smoke.dart` are expected to be green. CI pins
   Dart 3.13.5 and checks that the generated CLI version matches `pubspec.yaml`.
@@ -44,8 +65,13 @@ These are deliberate scope boundaries, not regressions:
 - **PDF rendering** is a display-list foundation, not pixel-faithful
   rasterization. Glyph outlines, arbitrary transforms, clipping, shadings,
   masks, blend modes, and DCT/JPX/CCITT/JBIG2 image codecs are not implemented.
-- **DICOM/NITF pixels** are never decoded. Visual output uses placeholder
-  commands based on known geometry.
+  The HTML page adapter's SVG/PNG export uses the browser's SVG serializer and
+  canvas, so it inherits these display-list limits.
+- **DICOM pixel rendering** covers uncompressed implicit/explicit LE, explicit
+  BE, deflated, RLE, and JPEG-baseline data, with a 2048px output cap and a
+  16M-input-pixel guard. JPEG-LS, JPEG 2000, JPEG lossless, PALETTE COLOR, and
+  some RLE/YBR combinations are not decoded and surface viewer notices. NITF
+  pixels are still never decoded; its visual output remains a placeholder.
 - **DICOM dictionary** covers common attributes and keywords, but is not an
   exhaustive generated PS3.6 table.
 - **NITF/STANAG** extraction is conservative. Tactical word semantics, dense
@@ -68,15 +94,17 @@ These are deliberate scope boundaries, not regressions:
 Ordered by value for the vault pipeline:
 
 1. **Faithful visual rendering track:** complete the PDF display list
-   (transforms/clipping/text positioning), add raster/image codec support, then
-   project DICOM/NITF frames into renderable pages.
+   (transforms/clipping/text positioning), add raster/image codec support
+   (JPEG-LS/JPEG 2000/lossless, NITF), and project DICOM/NITF frames into
+   `VisualDocument` so every renderer shares one pipeline.
 2. **Adapter packages:** Flutter `DocumentView` and Jaspr/HTML adapters that
    consume `DocumentIr`/`VisualDocument` without adding framework dependencies
-   to this core package.
+   to this core package; a warm native popup/daemon can later replace the
+   generated-HTML browser handoff.
 3. **Standards depth:** exhaustive DICOM PS3.6 dictionary generation, fuller
    STANAG/NITF bodies, ISO 20022 ASN.1, and additional OOXML/ODF edge cases.
-4. **CLI polish:** shell completions, a `--watch` batch mode, and richer
-   render-time page selection (the current command intentionally stays small).
+4. **CLI polish:** a `--watch` batch mode and richer render-time page selection
+   (the current command intentionally stays small).
 5. **Conformance corpus:** expand the environment-gated real-file harness with
    externally generated PDFs, DICOM studies, OOXML, EPUB, and EML fixtures.
 6. **Performance:** re-run `benchmark/parse_benchmark.dart` on large PDFs,
@@ -97,6 +125,7 @@ dart test
 dart run bin/panthalassa.dart version --json
 dart run bin/panthalassa.dart formats --json >/dev/null
 dart run bin/panthalassa.dart parse README.md --json >/dev/null
+dart run bin/panthalassa.dart view README.md --no-open --out /tmp/readme.view.html --json >/dev/null
 dart compile js -O2 -o /tmp/panthalassa_web_smoke.js tool/web_smoke.dart
 ```
 

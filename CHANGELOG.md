@@ -1,13 +1,38 @@
 # Changelog
 
+## 0.5.2
+
+- **Viewer:** expanded `panthalassa view` with dedicated builders for XLSX/ODS
+  spreadsheets, raster image preview (JPEG/PNG/GIF/WebP/SVG), EML email,
+  PDF browser-native embedding, and structured JSON/XML/NIEM source. DICOM now
+  appends Structured Report text/tables for no-pixel/SR instances. Shared table
+  conversion lives in `viewerTableSection`; PDF embed uses an inline base64
+  payload decoded to a blob URL, with encrypted PDFs falling back to extracted
+  text.
+- **Rendering:** `DocumentPageAdapter` adds live search, language-aware code
+  highlighting, a zoom/pan lightbox with SVG/PNG export, a persistent collapsible
+  outline, collapsible sections, attachment previews, side-by-side
+  `DocumentDiff`, and print styles. `RenderOptions.collapsibleSections`,
+  heading ids, code language classes, and CLI `completions` round out the
+  release.
+
 ## 0.5.1
 
 - **CLI:** new `panthalassa` executable with `detect`, `parse`, `render`,
-  `batch`, `digest`, `formats`, and `version` commands; styled ANSI console,
-  `--json`/`--text`/`--metadata` modes, stdin (`-`) support, detection hints,
-  strict resource ceilings, bounded batch isolates, per-file JSON output, SVG
-  visual export, and `sysexits.h`-style exit codes. `args` is used only by
+  `view`, `batch`, `digest`, `formats`, and `version` commands; styled ANSI
+  console, `--json`/`--text`/`--metadata` modes, stdin (`-`) support, detection
+  hints, strict resource ceilings, bounded batch isolates, per-file JSON output,
+  SVG visual export, and `sysexits.h`-style exit codes. `args` is used only by
   `bin/`.
+- **Viewer:** generated self-contained HTML documents with a sticky, filterable
+  CSV/TSV table view and a DICOM image view. The DICOM path adds
+  `DicomParser.readImage` and a reusable `DicomPixelDecoder` for uncompressed
+  (implicit/explicit LE, explicit BE, deflated), RLE, and JPEG-baseline data,
+  with rescale/window handling, MONOCHROME1 inversion, YBR conversion, bounded
+  frame rendering, and PNG output. JPEG-LS, JPEG 2000, and JPEG lossless remain
+  unsupported and degrade to metadata-only notices. Viewer selection is
+  extensible through `ViewBuilder`/`ViewerRegistry`; other formats fall back to
+  semantic HTML.
 - **Content addressing:** `ParseResult` now carries SHA-256, SHA-384, and
   SHA-512 via `ContentDigest`/`PqBytesContentHasher`; `documentId` remains the
   SHA-256 hex string for vault compatibility. Results also stamp
@@ -31,8 +56,8 @@
 - **Packaging and CI:** standalone package resolution, Dart 3.13.5 CI, CLI
   version generation/check, CLI smoke coverage, web compile smoke target, and
   pub.dev-facing metadata/example fixes. Dependencies now floor at
-  `archive` 4.6 and `xml` 7.1, and the web/WASM hash backend avoids pqforge's
-  `dart:isolate` barrel while producing identical digests.
+  `archive` 4.6, `image` 4.12, and `xml` 7.1, and the web/WASM hash backend
+  avoids pqforge's `dart:isolate` barrel while producing identical digests.
 
 ## 0.5.0
 

@@ -12,10 +12,17 @@ abstract interface class DocumentRenderer<T> {
 
 /// Options shared by semantic renderers.
 final class RenderOptions {
-  const RenderOptions({this.includeMetadata = true, this.headingBaseLevel = 1});
+  const RenderOptions({
+    this.includeMetadata = true,
+    this.headingBaseLevel = 1,
+    this.collapsibleSections = false,
+  });
 
   final bool includeMetadata;
   final int headingBaseLevel;
+
+  /// Emits field groups as native `<details>`/`<summary>` sections.
+  final bool collapsibleSections;
 }
 
 /// Plain-text renderer for CLI, indexing, and lowest-common-denominator UI.
@@ -175,24 +182,33 @@ final class HtmlDocumentRenderer implements DocumentRenderer<String> {
       ..write('<article class="panthalassa-document" data-format="')
       ..write(_escapeHtml(document.sourceFormat.name))
       ..write('">');
+    final headingIds = <String, int>{};
     for (final block in document.body) {
       if (!options.includeMetadata &&
           block is FieldGroupBlock &&
           block.name == 'Metadata') {
         continue;
       }
-      _writeBlock(out, block, options);
+      _writeBlock(out, block, options, headingIds);
     }
     out.write('</article>');
     return out.toString();
   }
 
-  void _writeBlock(StringBuffer out, DocBlock block, RenderOptions options) {
+  void _writeBlock(
+    StringBuffer out,
+    DocBlock block,
+    RenderOptions options,
+    Map<String, int> headingIds,
+  ) {
     switch (block) {
       case HeadingBlock():
         final level = (block.level + options.headingBaseLevel - 1).clamp(1, 6);
+        final id = _uniqueHeadingId(_inlineText(block.text), headingIds);
         out
-          ..write('<h$level>')
+          ..write('<h$level id="')
+          ..write(_escapeHtml(id))
+          ..write('">')
           ..write(_inlineHtml(block.text))
           ..write('</h$level>');
       case ParagraphBlock():
@@ -208,20 +224,33 @@ final class HtmlDocumentRenderer implements DocumentRenderer<String> {
           ..write(_inlineHtml(block.value))
           ..write('</dd></dl>');
       case FieldGroupBlock():
-        out
-          ..write('<section><h2>')
-          ..write(_escapeHtml(block.name))
-          ..write('</h2>');
-        for (final child in block.children) {
-          _writeBlock(out, child, options);
+        final id = _uniqueHeadingId(block.name, headingIds);
+        final heading =
+            '<h2 id="${_escapeHtml(id)}">${_escapeHtml(block.name)}</h2>';
+        if (options.collapsibleSections) {
+          out
+            ..write('<details class="doc-section" data-section-id="')
+            ..write(_escapeHtml(id))
+            ..write('" open><summary class="section-summary">')
+            ..write(heading)
+            ..write('</summary><div class="section-body">');
+        } else {
+          out
+            ..write('<section>')
+            ..write(heading);
         }
-        out.write('</section>');
+        for (final child in block.children) {
+          _writeBlock(out, child, options, headingIds);
+        }
+        out.write(
+          options.collapsibleSections ? '</div></details>' : '</section>',
+        );
       case ListBlock():
         out.write(block.ordered ? '<ol>' : '<ul>');
         for (final item in block.items) {
           out.write('<li>');
           for (final child in item) {
-            _writeBlock(out, child, options);
+            _writeBlock(out, child, options, headingIds);
           }
           out.write('</li>');
         }
@@ -233,7 +262,7 @@ final class HtmlDocumentRenderer implements DocumentRenderer<String> {
           for (final cell in row) {
             out.write(cell.header ? '<th>' : '<td>');
             for (final child in cell.blocks) {
-              _writeBlock(out, child, options);
+              _writeBlock(out, child, options, headingIds);
             }
             out.write(cell.header ? '</th>' : '</td>');
           }
@@ -241,8 +270,18 @@ final class HtmlDocumentRenderer implements DocumentRenderer<String> {
         }
         out.write('</tbody></table>');
       case CodeBlock():
+        final language = _languageClass(block.language);
+        out.write('<pre><code');
+        if (language != null) {
+          out
+            ..write(' class="language-')
+            ..write(language)
+            ..write('" data-lang="')
+            ..write(language)
+            ..write('"');
+        }
         out
-          ..write('<pre><code>')
+          ..write('>')
           ..write(_escapeHtml(block.text))
           ..write('</code></pre>');
       case FigureBlock():
@@ -262,6 +301,27 @@ final class HtmlDocumentRenderer implements DocumentRenderer<String> {
           ..write(_escapeHtml(block.description ?? 'Visual block'))
           ..write('</div>');
     }
+  }
+
+  String? _languageClass(String? language) {
+    final normalized = language?.trim().toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9+#-]'),
+      '',
+    );
+    return normalized == null || normalized.isEmpty ? null : normalized;
+  }
+
+  String _uniqueHeadingId(String text, Map<String, int> used) {
+    final slug = text
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    final base = (slug.isEmpty ? 'section' : slug).substring(
+      0,
+      slug.length > 80 ? 80 : null,
+    );
+    final count = used.update(base, (value) => value + 1, ifAbsent: () => 0);
+    return count == 0 ? base : '$base-${count + 1}';
   }
 }
 

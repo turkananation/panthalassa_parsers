@@ -19,8 +19,8 @@ binary (DICOM PS3.10/PS3.18 JSON, NITF, image metadata), the STANAG family
 HTML, and hint-gated Markdown/CSV/TSV. The headline capabilities are text
 extraction from ordinary PDFs plus pure-Dart semantic and visual render
 foundations. A companion `panthalassa` CLI lives in `bin/` and exposes the same
-registry for detection, parsing, rendering, batch ingestion, and content
-addressing without adding `dart:io` to the library.
+registry for detection, parsing, rendering, viewing, batch ingestion, and
+content addressing without adding `dart:io` to the library.
 
 ## Build & test
 
@@ -48,6 +48,8 @@ goes through `package:archive`, not `ZLibCodec` from `dart:io`.
   also carries SHA-384/SHA-512. Web/WASM uses the same PointyCastle primitives
   that `PqBytes` wraps, so digests remain byte-identical on every platform.
 - `archive` — pure-Dart ZIP + inflate (ODF/OOXML/EPUB containers, PDF FlateDecode).
+- `image` — pure-Dart JPEG baseline decode plus PNG encoding for DICOM frame
+  rendering. JPEG-LS/JPEG 2000/JPEG lossless are not covered by this codec.
 - `swissarmyknife` — safe JSON traversal, byte/string/collection helpers, and a
   bounded task queue used by batch parsing.
 - `xml` — FHIR/XML, CDA, ISO 20022, ODF/OOXML content, EPUB/OPF, STANAG XML.
@@ -66,6 +68,8 @@ bin/
     parse_commands.dart           # parse / render
     batch_command.dart            # bounded batch ingestion
     digest_command.dart           # SHA-256/384/512 content addressing
+    view_command.dart             # HTML viewer output + browser launch
+    completions_command.dart      # Bash/Zsh/Fish completion scripts
     version.g.dart                # generated from pubspec.yaml
 tool/
   version/generate_version.dart   # single-source CLI version + --check
@@ -93,6 +97,7 @@ lib/
     hl7v2_parser.dart, x12_parser.dart, edifact_parser.dart, step_parser.dart
     usmtf_parser.dart
     dicom_parser.dart, dicom_json_parser.dart, dicom_sr.dart
+    dicom/dicom_image.dart         # pixel model, decoder (native/RLE/JPEG), PNG encode
     nitf_parser.dart
     odf_parser.dart, ooxml_parser.dart, epub_parser.dart
     eml_parser.dart, html_parser.dart, markdown_parser.dart, csv_parser.dart
@@ -110,15 +115,31 @@ lib/
     visual_primitives.dart         # pure-Dart page/frame geometry + visual commands
     visual_document.dart           # DIR -> VisualDocument projection
     visual_renderer.dart           # SVG visual renderer
+    document_diff.dart             # pure-Dart line diff + side-by-side row model
+    document_page_adapter.dart     # pure-Dart HTML page adapter (semantic + visual)
     stanag/
       stanag_parser.dart           # family dispatcher + StanagSubParser contract
       stanag_4607_gmti.dart        # GMTI (binary)
       stanag_4609_motion_imagery.dart  # MPEG-2 TS / MISB KLV
       stanag_xml.dart              # 4676 NITS, 4774 label, 4778 binding
+  src/view/
+    viewer_document.dart           # ViewerDocument model + ViewBuilder SPI
+    viewer_registry.dart           # viewer-builder selection
+    viewer_html.dart               # self-contained HTML/CSS/JS shell
+    viewer_support.dart            # basename + shared viewer helpers
+    csv_view_builder.dart          # filterable CSV/TSV table view
+    dicom_view_builder.dart        # DICOM image frames, SR/no-pixel text, notices
+    document_view_builder.dart     # semantic-HTML fallback
+    spreadsheet_view_builder.dart  # XLSX/ODS sheet sections
+    image_view_builder.dart        # raster/SVG preview + metadata table
+    email_view_builder.dart        # EML headers, body, attachments
+    pdf_view_builder.dart          # PDF embed + extracted text fallback
+    structured_source_view_builder.dart  # pretty JSON/XML/NIEM source
 test/
   framework_test.dart  structured_formats_test.dart  binary_formats_test.dart
   pdf_test.dart  odf_test.dart  ooxml_test.dart  eml_test.dart  html_test.dart
   new_formats_test.dart  stanag_test.dart
+  cli_test.dart  dicom_image_test.dart  viewer_test.dart
   support/fixtures.dart           # synthesises fixtures in-code
 ```
 
@@ -132,6 +153,7 @@ console. Commands:
 | `detect` | `detectDetailed`; `--filename`/`--mime`; `--require-match` exits 65 when unknown. |
 | `parse` | Human summary, `--json` (`ParseResult` schema), `--text`, `--metadata`; shared `ParseOptions`/`ParseLimits` flags. |
 | `render` | `text`, `markdown`, `html`, or `svg` through `DocumentIr`/`SvgVisualRenderer`. |
+| `view` | Parse, select a `ViewBuilder`, write self-contained HTML, and open a browser. CSV/TSV, XLSX/ODS, image, EML, PDF, DICOM, and structured JSON/XML/NIEM builders. `--out`, `--no-open`, `--print-path`, `--raw`, `--json`, `--sync`, `--quiet`, `--title`, `--limit`/`--all-rows`, and DICOM `--frame`/`--all-frames`/`--window-center`/`--window-width`/`--invert`. |
 | `batch` | `expandBatchInputs` + `mapPool`; bounded isolate concurrency; `--out-dir`, `--json`, `--fail-fast`. |
 | `digest` | `PqBytesContentHasher`; all three digests by default; `--expect` compares SHA-256. |
 | `formats` | Formats grouped by category, capabilities, hint requirements, parser classes. |
@@ -170,10 +192,12 @@ version is generated from `pubspec.yaml` and checked in CI.
    third-party exceptions. Nothing untyped escapes a parser.
 6. **Bounds-checked binary reads** through `ByteReader`, which throws
    `TruncatedDocumentException` past end-of-buffer.
-7. **CLI I/O stays in `bin/`.** `dart:io`, `package:args`, terminal styling, and
-   file reading belong to the executable layer. `lib/` must stay pure Dart and
-   web-safe; the CLI must call the public registry/render APIs rather than
-   duplicating parser logic.
+7. **CLI I/O stays in `bin/`.** `dart:io`, `package:args`, terminal styling,
+   file reading, cache paths, and browser launching belong to the executable
+   layer. `lib/` must stay pure Dart and web-safe; viewer builders consume
+   `ParseResult` + bytes and return a `ViewerDocument`, while the CLI handles
+   paths and OS integration. The CLI must call the public registry/render APIs
+   rather than duplicating parser logic.
 
 ## STANAG family
 
@@ -196,7 +220,7 @@ NITF parser** (it recognises the `NSIF` header), so it is not duplicated.
 | ISO 20022 | XML messages (pain/pacs/camt/…): message-definition id from namespace, group header, parties/agents, debtor/creditor accounts, transaction table, per-currency totals, balances metadata. ASN.1 variant not impl (rare). |
 | X12 | ANSI ASC X12: positional ISA delimiters, GS/ST envelope, transaction sets, element text. |
 | Generic JSON / XML | Catch-all structured extraction (text + content-id + shape metadata) for anything unrecognised. |
-| DICOM | PS3.10 meta group + dataset; SQ descent including undefined-length items; multi-valued rendering; broad keyword dictionary; SR content trees (text/outline/table); encapsulated PDF/CDA attachments when `parseAttachments` is enabled; visual frame placeholder when dimensions are known. Pixel data is never decoded; the dictionary is not an exhaustive generated PS3.6 table. |
+| DICOM | PS3.10 meta group + dataset; SQ descent including undefined-length items; multi-valued rendering; broad keyword dictionary; SR content trees (text/outline/table); encapsulated PDF/CDA attachments when `parseAttachments` is enabled; visual frame placeholder when dimensions are known. `DicomParser.readImage` discovers pixel tags and `DicomPixelDecoder` renders uncompressed implicit/explicit LE, explicit BE, deflated, RLE, and JPEG-baseline frames with rescale/windowing, MONOCHROME1 inversion, mono/RGB/YBR handling, a 2048px output cap, and a 16M-input-pixel guard. JPEG-LS, JPEG 2000, JPEG lossless, PALETTE COLOR, and some RLE/YBR combinations surface as `UnsupportedFeatureException`; ordinary `parse` stays metadata-only. The dictionary is not an exhaustive generated PS3.6 table. |
 | DICOM JSON | PS3.18 tag-keyed model: nested sequences, PersonName objects, dictionary metadata, SR extraction, `InlineBinary` attachments, and `BulkDataURI` reporting without fetching. |
 | NITF | File header + image/graphic/text/DES/RES segment tables, subheaders, offsets, safe text-body extraction, and visual image placeholder when dimensions are known. Image pixels are not decoded. |
 | ODF | ODT paragraphs/headings/tables; ODS sheets, repeated rows/cells, and values/formulas; ODP slides, speaker notes, and tables. Meta statistics and embedded media. No layout rendering. |
@@ -227,6 +251,15 @@ See `CONTINUATION.md` for the remaining backlog and known limitations.
 - New CLI behavior → add it under `bin/src/`, keep raw data on stdout and
   diagnostics on stderr, preserve `--json` for machine consumers, and add a
   focused test where the logic is not purely presentation.
+- New viewer behavior → implement a `ViewBuilder` in `lib/src/view/`, register
+  it in `ViewerRegistry`, keep HTML assembly in `viewer_html.dart`, and keep
+  file paths/cache directories/browser launch in `bin/src/view_command.dart`.
+  Viewer output must stay self-contained and degrade to a notice when a codec or
+  feature is unsupported.
+- New adapter behavior → keep `DocumentPageAdapter` framework-free with embedded
+  CSS/vanilla JS only, no CDN or runtime dependency. Treat attachment bytes/text
+  as optional payloads, cap inline data URIs, and keep semantic content usable
+  without JavaScript.
 - Version changes → update `pubspec.yaml`, `parserImplementationVersion`, the
   generated CLI version (`dart run tool/version/generate_version.dart`), the
   changelog, and `CONTINUATION.md`.

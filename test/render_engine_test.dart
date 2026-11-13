@@ -64,6 +64,83 @@ void main() {
     expect(inherited.pages.single.geometry.height, 200);
   });
 
+  test('PDF `cm` graphics-state transform is applied to text position', () {
+    final result = registry.parse(buildTransformedPdf(showText: 'Scaled Text'));
+    final visualPages = result.metadata['visualPages'] as List;
+    expect(visualPages, hasLength(1));
+
+    final doc = DocumentIr.fromParseResult(result).toVisualDocument();
+    expect(doc.pages, hasLength(1));
+
+    final textCommands = doc.pages.single.commands
+        .whereType<VisualTextCommand>()
+        .toList();
+    expect(textCommands, hasLength(1));
+    final command = textCommands.single;
+    expect(command.text, 'Scaled Text');
+    // CTM = [2, 0, 0, 2, 100, 100] applied to text position (0, 0) → (100, 100)
+    expect(command.x, 100);
+    expect(command.y, 100);
+
+    final svg = const SvgVisualRenderer().render(doc);
+    expect(svg, contains('x="100"'));
+    // SVG flips Y for screen space: 792 - 100 = 692
+    expect(svg, contains('y="692"'));
+    expect(svg, contains('Scaled Text'));
+
+    // `cm` must not surface as an unsupported operator
+    final unsupported = doc.pages.single.commands
+        .whereType<VisualUnsupportedCommand>();
+    expect(unsupported.any((c) => c.operatorName == 'cm'), isFalse);
+  });
+
+  test('PDF `q`/`Q` graphics-state save/restore resets CTM', () {
+    final result = registry.parse(buildSavedStatePdf());
+    final doc = DocumentIr.fromParseResult(result).toVisualDocument();
+    expect(doc.pages, hasLength(1));
+
+    final texts = doc.pages.single.commands
+        .whereType<VisualTextCommand>()
+        .toList();
+    expect(texts, hasLength(2));
+
+    // Inner text: CTM [3, 0, 0, 3, 50, 50] applied to (0, 0) → (50, 50)
+    expect(texts[0].text, 'Inner');
+    expect(texts[0].x, 50);
+    expect(texts[0].y, 50);
+
+    // Outer text: after Q, CTM is identity, so (72, 700) stays (72, 700)
+    expect(texts[1].text, 'Outer');
+    expect(texts[1].x, 72);
+    expect(texts[1].y, 700);
+  });
+
+  test('PDF `cm` transform is applied to rectangle commands', () {
+    final content = ascii.encode(
+      '1 0 0 1 120 640 cm 0.2 0.4 0.6 rg 120 640 80 30 re f',
+    );
+    final result = registry.parse(
+      _pdfWithContent(content),
+      options: const ParseOptions(includeVisual: true),
+    );
+    final doc = DocumentIr.fromParseResult(result).toVisualDocument();
+    expect(doc.pages, hasLength(1));
+
+    final rects = doc.pages.single.commands
+        .whereType<VisualRectCommand>()
+        .toList();
+    expect(rects, hasLength(1));
+    final rect = rects.single;
+    // CTM [1, 0, 0, 1, 120, 640] applied to rect origin (120, 640) → (240, 1280)
+    // But page height is 792, so this rect is off-page — that's fine, we just
+    // verify the transform was applied.
+    expect(rect.x, 240);
+    expect(rect.y, 1280);
+    expect(rect.width, 80);
+    expect(rect.height, 30);
+    expect(rect.fill?.hex, '#336699');
+  });
+
   test('PDF visual extraction surfaces rectangles and image placeholders', () {
     final shape = DocumentIr.fromParseResult(
       registry.parse(buildVisualShapePdf()),
@@ -189,4 +266,27 @@ final class _Parser implements DocumentParser {
   @override
   ParseResult parse(Uint8List bytes, {required ContentHasher hasher}) =>
       throw const UnsupportedFormatException('test parser');
+}
+
+/// Builds a minimal PDF with an arbitrary content stream, for testing visual
+/// operators in isolation.
+Uint8List _pdfWithContent(Uint8List content) {
+  final out = BytesBuilder();
+  void put(String s) => out.add(latin1.encode(s));
+
+  put('%PDF-1.7\n');
+  put('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  put('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+  put(
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] '
+    '/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n',
+  );
+  put('4 0 obj\n<< /Length ${content.length} >>\nstream\n');
+  out.add(content);
+  put('\nendstream\nendobj\n');
+  put(
+    '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+  );
+  put('trailer\n<< /Root 1 0 R >>\n%%EOF');
+  return out.toBytes();
 }

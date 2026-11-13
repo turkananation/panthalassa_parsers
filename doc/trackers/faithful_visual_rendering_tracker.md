@@ -26,20 +26,24 @@ package pure Dart, web-safe, and honest about unsupported format features.
 | PDF simple text layer | Complete initial | Basic `Tf`, `Td`, `Tm`, `Tj`, `TJ`, quote operators produce positioned text commands using existing font decoding. | `test/render_engine_test.dart`. |
 | PDF simple rectangles | Complete initial | `re` plus fill/stroke operators produce rectangle commands. | `test/render_engine_test.dart`; `buildVisualShapePdf()`. |
 | PDF image placeholders | Complete initial | Inline images and image XObjects surface placeholders instead of corrupting text/operator parsing. | `test/render_engine_test.dart`; `buildInlineImagePdf()`. |
-| PDF graphics-state transforms | Not started | Correct CTM/text matrix handling for `cm`, scaling, rotation, nested graphics state, and form XObjects. | Future PDF visual fixtures. |
+| PDF graphics-state transforms | Complete | `cm` operator sets the CTM; `q`/`Q` save/restore it; applied to text position and rectangle bounding boxes. Form XObjects inherit CTM via state copy. | `lib/src/parsers/pdf/pdf_visual.dart`; `test/render_engine_test.dart`. |
 | PDF clipping/path/shading/masks | Not started | Clip paths, arbitrary paths, shadings, transparency, masks, blend modes represented or rendered. | Future conformance corpus. |
 | PDF font glyph outlines/rasterization | Not started | Embedded/CID font glyph shapes render accurately without native libraries. | Future dedicated package/suite. |
 | PDF image codec decode | Not started | DCT, JPX, CCITT, JBIG2 and color spaces decode or fail closed with diagnostics. | Future image fixture suite. |
-| DICOM pixel decode | Not started | Uncompressed baseline grayscale/RGB pixel data decodes to renderable frames with window/level metadata. | Future DICOM pixel fixtures. |
+| DICOM pixel decode | Complete initial (viewer path) | Uncompressed implicit/explicit LE, explicit BE, deflated, RLE, and JPEG-baseline frames decode to PNG with rescale/windowing; unsupported codecs fail closed with notices. | `lib/src/parsers/dicom/dicom_image.dart`; `test/dicom_image_test.dart`; CLI `view`. |
 | NITF pixel/tile decode | Not started | NITF image segments decode/lazily tile with safe resource limits. | Future NITF imagery fixtures. |
-| Flutter canvas adapter | Not started | Separate Flutter layer maps display-list commands to `CustomPainter`, selection/search overlay, and lazy pages. | Flutter widget tests/screenshots. |
-| Jaspr visual adapter | Not started | Separate Jaspr/web layer consumes SVG or typed display-list components safely. | Jaspr smoke test. |
+| Pure-Dart HTML page adapter | Complete | `DocumentPageAdapter` combines `DocumentIr` (semantic) and `VisualDocument` (faithful SVG pages) into one self-contained HTML page: themes, persistent outline, find-in-page, syntax highlighting, zoom/pan lightbox with SVG/PNG export, collapsible sections, attachment previews, side-by-side `DocumentDiff`, and print styles. Framework-free and web-safe with embedded CSS/vanilla JS only. | `lib/src/render/document_page_adapter.dart`; `lib/src/render/document_diff.dart`; `test/document_page_adapter_test.dart`; `test/document_diff_test.dart`. |
+| Flutter canvas adapter | Not started | Separate Flutter layer maps display-list commands to `CustomPainter`, selection/search overlay, and lazy pages. Consumes the same `DocumentIr`/`VisualDocument` model. | Flutter widget tests/screenshots. |
+| Jaspr visual adapter | Not started | Separate Jaspr/web layer consumes SVG or typed display-list components safely. Consumes the same `DocumentIr`/`VisualDocument` model. | Jaspr smoke test. |
 
 ## Current Fidelity Contract
 
 The engine can now emit a faithful-rendering substrate: page geometry plus a
 bounded display list. PDF pages with simple positioned text can render to SVG.
-Image-bearing binary formats expose placeholders when dimensions are known.
+Image-bearing binary formats expose placeholders when dimensions are known. The
+self-contained HTML adapter consumes both models and can export each visual page
+as SVG or PNG in the browser. The DICOM viewer has a separate PNG decode path for
+supported pixel syntaxes; it is not yet projected into the shared display list.
 
 This is not yet a full pixel rasterizer. Unsupported visual PDF operators and
 undecoded image codecs must remain visible in diagnostics until implemented and
